@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Windows;
@@ -86,18 +87,18 @@ public class PropertyReader
 
         if (element is FrameworkElement fe)
         {
-            sb.Append($"\"actualWidth\":{fe.ActualWidth}");
-            sb.Append($",\"actualHeight\":{fe.ActualHeight}");
-            sb.Append($",\"desiredSize\":{{\"width\":{fe.DesiredSize.Width},\"height\":{fe.DesiredSize.Height}}}");
-            sb.Append($",\"renderSize\":{{\"width\":{fe.RenderSize.Width},\"height\":{fe.RenderSize.Height}}}");
-            sb.Append($",\"margin\":{{\"left\":{fe.Margin.Left},\"top\":{fe.Margin.Top},\"right\":{fe.Margin.Right},\"bottom\":{fe.Margin.Bottom}}}");
+            sb.Append($"\"actualWidth\":{FormatValue(fe.ActualWidth)}");
+            sb.Append($",\"actualHeight\":{FormatValue(fe.ActualHeight)}");
+            sb.Append($",\"desiredSize\":{{\"width\":{FormatValue(fe.DesiredSize.Width)},\"height\":{FormatValue(fe.DesiredSize.Height)}}}");
+            sb.Append($",\"renderSize\":{{\"width\":{FormatValue(fe.RenderSize.Width)},\"height\":{FormatValue(fe.RenderSize.Height)}}}");
+            sb.Append($",\"margin\":{{\"left\":{FormatValue(fe.Margin.Left)},\"top\":{FormatValue(fe.Margin.Top)},\"right\":{FormatValue(fe.Margin.Right)},\"bottom\":{FormatValue(fe.Margin.Bottom)}}}");
             sb.Append($",\"horizontalAlignment\":\"{fe.HorizontalAlignment}\"");
             sb.Append($",\"verticalAlignment\":\"{fe.VerticalAlignment}\"");
             sb.Append($",\"visibility\":\"{fe.Visibility}\"");
 
             if (fe is System.Windows.Controls.Control control)
             {
-                sb.Append($",\"padding\":{{\"left\":{control.Padding.Left},\"top\":{control.Padding.Top},\"right\":{control.Padding.Right},\"bottom\":{control.Padding.Bottom}}}");
+                sb.Append($",\"padding\":{{\"left\":{FormatValue(control.Padding.Left)},\"top\":{FormatValue(control.Padding.Top)},\"right\":{FormatValue(control.Padding.Right)},\"bottom\":{FormatValue(control.Padding.Bottom)}}}");
             }
         }
 
@@ -174,9 +175,17 @@ public class PropertyReader
         {
             return ((bool)value) ? "true" : "false";
         }
+        if (value is double doubleValue && (double.IsNaN(doubleValue) || double.IsInfinity(doubleValue)))
+        {
+            return "null";
+        }
+        if (value is float floatValue && (float.IsNaN(floatValue) || float.IsInfinity(floatValue)))
+        {
+            return "null";
+        }
         if (type.IsPrimitive || type == typeof(decimal))
         {
-            return value.ToString() ?? "null";
+            return Convert.ToString(value, CultureInfo.InvariantCulture) ?? "null";
         }
 
         // Handle common WPF types

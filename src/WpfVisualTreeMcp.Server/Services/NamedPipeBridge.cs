@@ -819,7 +819,7 @@ public class NamedPipeBridge : IIpcBridge
                     {
                         Name = prop.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "",
                         TypeName = prop.TryGetProperty("typeName", out var t) ? t.GetString() ?? "" : "",
-                        Value = prop.TryGetProperty("value", out var v) ? v.GetString() : null,
+                        Value = prop.TryGetProperty("value", out var v) ? GetJsonValueAsString(v) : null,
                         Source = prop.TryGetProperty("source", out var s) ? s.GetString() ?? "Unknown" : "Unknown"
                     });
                 }
@@ -831,6 +831,16 @@ public class NamedPipeBridge : IIpcBridge
         }
 
         return result;
+    }
+
+    private static string? GetJsonValueAsString(JsonElement value)
+    {
+        return value.ValueKind switch
+        {
+            JsonValueKind.Null => null,
+            JsonValueKind.String => value.GetString(),
+            _ => value.GetRawText()
+        };
     }
 
     private FindElementsResult ParseFindElementsResponse(FindElementsResponse response)
@@ -1057,7 +1067,7 @@ public class NamedPipeBridge : IIpcBridge
                 {
                     Key = resource.TryGetProperty("key", out var k) ? k.GetString() ?? "" : "",
                     TypeName = resource.TryGetProperty("typeName", out var t) ? t.GetString() ?? "" : "",
-                    Value = resource.TryGetProperty("value", out var v) ? v.GetString() : null,
+                    Value = resource.TryGetProperty("value", out var v) ? GetJsonValueAsString(v) : null,
                     Source = resource.TryGetProperty("source", out var s) ? s.GetString() ?? "" : ""
                 });
             }
@@ -1105,7 +1115,7 @@ public class NamedPipeBridge : IIpcBridge
                         result.Style.Setters.Add(new SetterInfo
                         {
                             Property = setter.TryGetProperty("property", out var p) ? p.GetString() ?? "" : "",
-                            Value = setter.TryGetProperty("value", out var v) ? v.GetString() : null
+                            Value = setter.TryGetProperty("value", out var v) ? GetJsonValueAsString(v) : null
                         });
                     }
                 }
