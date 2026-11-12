@@ -128,8 +128,19 @@ public class WpfElement : IEquatable<WpfElement>
     public Task ScrollAsync(int delta) => Owner.Transport.ScrollAsync(Handle, delta);
     public Task WaitForStableBoundsAsync() => Owner.Transport.WaitForStableBoundsAsync(Handle);
     public Task<string> RenderedTextAsync() => Owner.Transport.RenderedTextAsync(Handle);
+    public async Task<TextLayout> TextLayoutAsync() => new(WpfSession.Value((await ReadAsync("", "$textLayout")).GetProperty("value"), "$textLayout"));
+    public async Task<bool> AncestorIsEnabledAsync(int generations)
+    {
+        if (generations < 1) throw new ArgumentOutOfRangeException(nameof(generations));
+        var path = string.Join(".", Enumerable.Repeat("Parent", generations));
+        return WpfSession.Value((await ReadAsync(path, "IsEnabled")).GetProperty("value"), "IsEnabled").GetBoolean();
+    }
+    public async Task<bool> OwnedToolTipIsOpenAsync() => WpfSession.Value((await ReadAsync("ToolTip", "IsOpen")).GetProperty("value"), "IsOpen").GetBoolean();
+    public async Task<bool> HasNoEffectAsync() => WpfSession.Value((await ReadAsync("", "Effect")).GetProperty("value"), "Effect").ValueKind == JsonValueKind.Null;
+    public async Task<string?> EffectTypeNameAsync() => WpfSession.Value((await ReadAsync("", "Effect")).GetProperty("value"), "Effect").GetProperty("type").GetString();
     public Task<JsonElement> ReadAsync(string path, string fields) => Owner.Transport.ReadAsync(Handle, path, fields);
     public Task<JsonElement> BindingsAsync() => Owner.Transport.BindingsAsync(Handle);
+    public async Task<BindingInfo[]> BindingInfoAsync() => (await BindingsAsync()).GetProperty("Bindings").EnumerateArray().Select(binding => new BindingInfo(binding)).ToArray();
     public Task<JsonElement> PropertiesAsync() => Owner.Transport.PropertiesAsync(Handle);
     public async Task<string?> RuntimeTypeNameAsync() => (await Owner.Transport.TreeAsync(Handle)).GetProperty("Root").GetProperty("TypeName").GetString();
     public Task SetPropertyAsync(string property, string value) => Owner.Transport.SetPropertyAsync(Handle, property, value);
@@ -163,6 +174,11 @@ public class FrameworkElement(WpfElement element) : UIElement(element)
     public Task<bool> IsVisibleAsync() => PropertyAsync<bool>("IsVisible");
     public Task<bool> IsEnabledAsync() => PropertyAsync<bool>("IsEnabled");
     public Task<string?> ToolTipTextAsync() => PropertyAsync<string>("ToolTip");
+    public async Task<string?> ToolTipTextIfStringAsync()
+    {
+        var value = WpfSession.Value((await ReadAsync("", "ToolTip")).GetProperty("value"), "ToolTip");
+        return value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+    }
     public async Task<bool> HasEmptyToolTipAsync()
     {
         var member = (await ReadAsync("", "ToolTip")).GetProperty("value").GetProperty("ToolTip");
@@ -183,6 +199,7 @@ public class Control(WpfElement element) : FrameworkElement(element);
 [WpfType("ContentControl")]
 public class ContentControl(WpfElement element) : Control(element)
 {
+    public async Task<string> ContentValueTextAsync() => WpfSession.Value((await ReadAsync("", "Content")).GetProperty("value"), "Content").ToString();
     public async Task<bool> IsContentNullAsync() => WpfSession.Value((await ReadAsync("", "Content")).GetProperty("value"), "Content").ValueKind == JsonValueKind.Null;
     public async Task<string?> ContentTextAsync()
     {
@@ -198,6 +215,8 @@ public class UserControl(WpfElement element) : ContentControl(element);
 [WpfType("HeaderedContentControl")]
 public class HeaderedContentControl(WpfElement element) : ContentControl(element)
 {
+    public async Task<HeaderValue> HeaderAsync() => new(WpfSession.Value((await ReadAsync("", "Header")).GetProperty("value"), "Header"));
+    public async Task<string> HeaderObjectTextAsync() => WpfSession.Value((await ReadAsync("Header", "Text")).GetProperty("value"), "Text").ToString();
     public async Task<string?> HeaderTextAsync()
     {
         var member = (await ReadAsync("", "Header")).GetProperty("value").GetProperty("Header");
@@ -271,7 +290,10 @@ public class ItemsControl(WpfElement element) : Control(element)
 }
 
 [WpfType("HeaderedItemsControl")]
-public class HeaderedItemsControl(WpfElement element) : ItemsControl(element);
+public class HeaderedItemsControl(WpfElement element) : ItemsControl(element)
+{
+    public async Task<HeaderValue> HeaderAsync() => new(WpfSession.Value((await ReadAsync("", "Header")).GetProperty("value"), "Header"));
+}
 
 [WpfType("MenuItem")]
 public class MenuItem(WpfElement element) : HeaderedItemsControl(element);
@@ -289,6 +311,7 @@ public class TreeViewItem(WpfElement element) : HeaderedItemsControl(element)
 public class Selector(WpfElement element) : ItemsControl(element)
 {
     public Task<int> SelectedIndexAsync() => PropertyAsync<int>("SelectedIndex");
+    public async Task<string?> SelectedItemTypeNameAsync() => WpfSession.Value((await ReadAsync("", "SelectedItem")).GetProperty("value"), "SelectedItem").GetProperty("type").GetString();
     public Task SetSelectedIndexAsync(int index) => SetPropertyAsync("SelectedIndex", index.ToString(System.Globalization.CultureInfo.InvariantCulture));
     public Task SelectItemAsync(string text) => Owner.Transport.SelectItemAsync(Handle, text);
 }
@@ -409,7 +432,10 @@ public class Decorator(WpfElement element) : FrameworkElement(element);
 public class Border(WpfElement element) : Decorator(element);
 
 [WpfType("Image")]
-public class Image(WpfElement element) : FrameworkElement(element);
+public class Image(WpfElement element) : FrameworkElement(element)
+{
+    public Task<string?> SourceUriAsync() => PropertyAsync<string>("Source.UriSource.AbsoluteUri");
+}
 
 [WpfType("Shape")]
 public class Shape(WpfElement element) : FrameworkElement(element);

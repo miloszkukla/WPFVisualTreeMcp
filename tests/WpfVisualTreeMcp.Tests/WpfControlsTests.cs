@@ -406,4 +406,48 @@ public class WpfControlsTests
 
     [WpfType("C1DataGrid")]
     public sealed class CustomGrid(WpfElement element) : Control(element);
+
+    [Fact]
+    public async Task TextLayoutPreservesCharacterGeometryAndIncompleteState()
+    {
+        var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
+        transport.Setup(x => x.FindAsync(null, "TextBlock", null, null, null, true, 10000)).ReturnsAsync("text");
+        transport.Setup(x => x.ReadAsync("text", "", "$textLayout"))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { value = new Dictionary<string, object> { ["$textLayout"] = new { value = new {
+                text = "ab", visible = true, truncated = true, deadlineReached = false, windowHandle = 123,
+                runs = new[] { new { characters = new[] { new { offset = 0, length = 1, visible = true, x = 1.0, y = 2.0, width = 3.0, height = 4.0 } } } }
+            } } } }));
+        var block = await new WpfControls(transport.Object).FindAsync<TextBlock>();
+
+        var layout = await block.TextLayoutAsync();
+        layout.Text.Should().Be("ab");
+        layout.IsVisible.Should().BeTrue();
+        layout.IsTruncated.Should().BeTrue();
+        layout.DeadlineReached.Should().BeFalse();
+        layout.WindowHandle.Should().Be(123);
+        var character = layout.Characters.Single();
+        character.Offset.Should().Be(0);
+        character.Length.Should().Be(1);
+        character.IsVisible.Should().BeTrue();
+        character.Width.Should().Be(3.0);
+        character.Height.Should().Be(4.0);
+        transport.VerifyAll();
+    }
+
+
+    [Fact]
+    public async Task TooltipSelectorIgnoresObjectValuesButRejectsUnreadableProperties()
+    {
+        var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
+        transport.Setup(x => x.FindAsync(null, "Button", null, null, null, true, 10000)).ReturnsAsync("button");
+        transport.SetupSequence(x => x.ReadAsync("button", "", "ToolTip"))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { value = new { ToolTip = new { value = new { type = "ToolTip" } } } }))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { value = new { ToolTip = new { error = "unreadable" } } }));
+        var button = await new WpfControls(transport.Object).FindAsync<Button>();
+
+        (await button.ToolTipTextIfStringAsync()).Should().BeNull();
+        await button.Invoking(x => x.ToolTipTextIfStringAsync()).Should().ThrowAsync<InvalidOperationException>();
+        transport.VerifyAll();
+    }
+
 }
