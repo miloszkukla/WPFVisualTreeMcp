@@ -2,8 +2,12 @@ using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading.Tasks;
+
+[assembly: InternalsVisibleTo("WpfVisualTreeMcp.Tests")]
 
 namespace WpfVisualTreeMcp.Injector;
 
@@ -141,10 +145,14 @@ public class ProcessInjector
             RedirectStandardOutput = true,
             RedirectStandardError = true,
         };
+        ConfigureHelperEnvironment(psi, targetIs64Bit, Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86));
 
         using var helperProc = Process.Start(psi);
         if (helperProc == null)
-            return false;
+            throw new InvalidOperationException($"Architecture-mismatch helper did not start for process {processId}.");
+
+        var stdout = ReadHelperOutputAsync(helperProc.StandardOutput);
+        var stderr = ReadHelperOutputAsync(helperProc.StandardError);
 
         if (!helperProc.WaitForExit(15000))
         {
@@ -153,15 +161,49 @@ public class ProcessInjector
                 $"Architecture-mismatch helper timed out injecting into process {processId}.");
         }
 
-        // Drain output streams to avoid the helper hanging on a full pipe.
-        var stdout = helperProc.StandardOutput.ReadToEnd();
-        var stderr = helperProc.StandardError.ReadToEnd();
-        // (Streams are surfaced via the helper's exit code; we deliberately don't
-        // throw on non-empty stderr because warnings are informational.)
-        _ = stdout;
-        _ = stderr;
+        ValidateHelperExit(helperProc.ExitCode, processId, stdout.GetAwaiter().GetResult(), stderr.GetAwaiter().GetResult());
+        return true;
+    }
 
-        return helperProc.ExitCode == 0;
+    internal static void ConfigureHelperEnvironment(ProcessStartInfo startInfo, bool targetIs64Bit, string programFilesX86)
+    {
+        if (targetIs64Bit) return;
+        startInfo.Environment.TryGetValue("DOTNET_ROOT_X86", out var root);
+        if (string.IsNullOrWhiteSpace(root)) startInfo.Environment.TryGetValue("DOTNET_ROOT(x86)", out root);
+        if (string.IsNullOrWhiteSpace(root) && !string.IsNullOrEmpty(programFilesX86))
+        {
+            var installedRoot = Path.Combine(programFilesX86, "dotnet");
+            if (Directory.Exists(installedRoot)) root = installedRoot;
+        }
+        if (string.IsNullOrWhiteSpace(root)) return;
+        startInfo.Environment["DOTNET_ROOT"] = root;
+        startInfo.Environment["DOTNET_ROOT_X86"] = root;
+        startInfo.Environment["DOTNET_ROOT(x86)"] = root;
+    }
+
+    internal static void ValidateHelperExit(int exitCode, int processId, string stdout, string stderr)
+    {
+        // A successful helper may write informational warnings to stderr.
+        if (exitCode == 0) return;
+        static string Bounded(string value) => value.Length <= 4096 ? value : value.Substring(0, 4096) + " [truncated]";
+        throw new InvalidOperationException(
+            $"Architecture-mismatch helper exited with code {exitCode} injecting into process {processId}." +
+            $"{Environment.NewLine}stdout: {Bounded(stdout)}{Environment.NewLine}stderr: {Bounded(stderr)}");
+    }
+
+    internal static async Task<string> ReadHelperOutputAsync(StreamReader reader)
+    {
+        var captured = new StringBuilder();
+        var buffer = new char[1024];
+        var truncated = false;
+        int count;
+        while ((count = await reader.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false)) != 0)
+        {
+            var keep = Math.Min(count, 4096 - captured.Length);
+            captured.Append(buffer, 0, keep);
+            truncated |= keep != count;
+        }
+        return captured.ToString() + (truncated ? " [truncated]" : "");
     }
 
     /// <summary>
