@@ -450,4 +450,54 @@ public class WpfControlsTests
         transport.VerifyAll();
     }
 
+
+    [Fact]
+    public async Task BindingSearchFindsExactNestedValuesWithoutSubstringMatches()
+    {
+        var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
+        transport.Setup(x => x.FindAsync(null, "Button", null, null, null, true, 10000)).ReturnsAsync("button");
+        transport.Setup(x => x.BindingsAsync("button")).ReturnsAsync(JsonSerializer.SerializeToElement(new { Bindings = new[] { new { Details = new[] { "Parent", "Exact.Path" } } } }));
+        var button = await new WpfControls(transport.Object).FindAsync<Button>();
+
+        (await button.BindingContainsAsync("Exact.Path")).Should().BeTrue();
+        (await button.BindingContainsAsync("Exact")).Should().BeFalse();
+        transport.VerifyAll();
+    }
+
+    [Fact]
+    public async Task InspectedTextDistinguishesUnreadableFromPresentNullAndNumber()
+    {
+        var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
+        transport.Setup(x => x.FindAsync(null, "Button", null, null, null, true, 10000)).ReturnsAsync("button");
+        transport.SetupSequence(x => x.ReadAsync("button", "DataContext", "Name"))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { value = new { Name = new { missing = true } } }))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { value = new { Name = new { error = "unreadable" } } }))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { value = new { Name = new { value = (string?)null } } }))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { value = new { Name = new { value = 12 } } }));
+        var button = await new WpfControls(transport.Object).FindAsync<Button>();
+
+        (await button.ReadTextAsync("DataContext", "Name")).Should().Be(new InspectedText(false, ""));
+        (await button.ReadTextAsync("DataContext", "Name")).Should().Be(new InspectedText(false, ""));
+        (await button.ReadTextAsync("DataContext", "Name")).Should().Be(new InspectedText(true, ""));
+        (await button.ReadTextAsync("DataContext", "Name")).Should().Be(new InspectedText(true, "12"));
+        transport.VerifyAll();
+    }
+
+    [Fact]
+    public async Task ObservedTextKeepsNonStringKindForRenderedMismatchDiagnostics()
+    {
+        var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
+        transport.Setup(x => x.FindAsync(null, "Button", null, null, null, true, 10000)).ReturnsAsync("button");
+        transport.Setup(x => x.ReadAsync("button", "", "Content"))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { value = new { Content = new { value = 12 } } }));
+        var button = await new WpfControls(transport.Object).FindAsync<Button>();
+
+        var value = await button.ObservedTextAsync(WpfTextField.Content);
+        value.IsString.Should().BeFalse();
+        value.Kind.Should().Be(ObservedTextKind.Number);
+        value.Text.Should().BeNull();
+        await button.Invoking(x => x.ObservedTextAsync((WpfTextField)42)).Should().ThrowAsync<ArgumentOutOfRangeException>();
+        transport.VerifyAll();
+    }
+
 }

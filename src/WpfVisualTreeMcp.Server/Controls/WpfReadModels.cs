@@ -22,3 +22,27 @@ public sealed class BindingInfo(JsonElement projection)
     public string? Property => projection.GetProperty("Property").GetString();
     public string? Path => projection.GetProperty("Path").GetString();
 }
+
+public readonly record struct InspectedText(bool IsAvailable, string Text);
+
+public enum WpfTextField { Text, Header, Content }
+
+public enum ObservedTextKind { Undefined, Object, Array, String, Number, True, False, Null }
+
+public readonly record struct ObservedText(string? Text, ObservedTextKind Kind)
+{
+    public bool IsString => Kind == ObservedTextKind.String;
+    public static ObservedText FromString(string? value) => new(value, value == null ? ObservedTextKind.Null : ObservedTextKind.String);
+    internal static ObservedText FromProjection(JsonElement value) => new(value.ValueKind == JsonValueKind.String ? value.GetString() : null, value.ValueKind switch
+    {
+        JsonValueKind.Undefined => ObservedTextKind.Undefined,
+        JsonValueKind.Object => ObservedTextKind.Object,
+        JsonValueKind.Array => ObservedTextKind.Array,
+        JsonValueKind.String => ObservedTextKind.String,
+        JsonValueKind.Number => ObservedTextKind.Number,
+        JsonValueKind.True => ObservedTextKind.True,
+        JsonValueKind.False => ObservedTextKind.False,
+        JsonValueKind.Null => ObservedTextKind.Null,
+        _ => throw new ArgumentOutOfRangeException(nameof(value))
+    });
+}

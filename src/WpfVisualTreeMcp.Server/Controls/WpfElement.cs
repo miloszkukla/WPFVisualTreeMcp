@@ -140,6 +140,36 @@ public class WpfElement : IEquatable<WpfElement>
     public async Task<string?> EffectTypeNameAsync() => WpfSession.Value((await ReadAsync("", "Effect")).GetProperty("value"), "Effect").GetProperty("type").GetString();
     public Task<JsonElement> ReadAsync(string path, string fields) => Owner.Transport.ReadAsync(Handle, path, fields);
     public Task<JsonElement> BindingsAsync() => Owner.Transport.BindingsAsync(Handle);
+    public async Task<bool> BindingContainsAsync(string expected) => ContainsString(await BindingsAsync(), expected);
+
+    private static bool ContainsString(JsonElement value, string expected) => value.ValueKind switch
+    {
+        JsonValueKind.String => value.GetString() == expected,
+        JsonValueKind.Object => value.EnumerateObject().Any(member => ContainsString(member.Value, expected)),
+        JsonValueKind.Array => value.EnumerateArray().Any(item => ContainsString(item, expected)),
+        _ => false
+    };
+
+    public async Task<InspectedText> ReadTextAsync(string path, string field)
+    {
+        var projection = await ReadAsync(path, field);
+        if (!projection.TryGetProperty("value", out var values) || !values.TryGetProperty(field, out var member)
+            || !member.TryGetProperty("value", out var value)) return new InspectedText(false, "");
+        return new InspectedText(true, value.ToString());
+    }
+
+    public async Task<ObservedText> ObservedTextAsync(WpfTextField field)
+    {
+        if (field == WpfTextField.Text) return ObservedText.FromString(await RenderedTextAsync());
+        var name = field switch
+        {
+            WpfTextField.Header => "Header",
+            WpfTextField.Content => "Content",
+            _ => throw new ArgumentOutOfRangeException(nameof(field))
+        };
+        var value = WpfSession.Value((await ReadAsync("", name)).GetProperty("value"), name);
+        return ObservedText.FromProjection(value);
+    }
     public async Task<BindingInfo[]> BindingInfoAsync() => (await BindingsAsync()).GetProperty("Bindings").EnumerateArray().Select(binding => new BindingInfo(binding)).ToArray();
     public Task<JsonElement> PropertiesAsync() => Owner.Transport.PropertiesAsync(Handle);
     public async Task<string?> RuntimeTypeNameAsync() => (await Owner.Transport.TreeAsync(Handle)).GetProperty("Root").GetProperty("TypeName").GetString();
