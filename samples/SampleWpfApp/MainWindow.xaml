@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SampleWpfApp"
+        xmlns:focusFixture="clr-namespace:SampleWpfApp.TabControls.Parts"
         mc:Ignorable="d"
         Title="Sample WPF Application - Visual Tree Inspector Test"
         Height="600" Width="800"
@@ -17,6 +18,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
@@ -69,6 +71,7 @@
 
                     <StackPanel Orientation="Horizontal">
                         <Button x:Name="SubmitButton"
+                                AutomationProperties.AutomationId="SubmitButtonExact"
                                 Content="Submit"
                                 Style="{StaticResource PrimaryButtonStyle}"
                                 Command="{Binding SubmitCommand}"/>
@@ -166,5 +169,33 @@
                            Foreground="Green"/>
             </Grid>
         </Border>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="8,0">
+            <TabControl x:Name="FocusSafetyTabs" Width="260" Height="78">
+                <TabItem x:Name="FocusSafetyFirstTab" Header="Keyboard target">
+                    <ListBox x:Name="KeyboardFocusList" SelectedIndex="0">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBoxItem>
+                            <UserControl x:Name="NonFocusableKeyboardTarget" Focusable="False">
+                                <TextBlock Text="First item"/>
+                            </UserControl>
+                        </ListBoxItem>
+                        <ListBoxItem Content="Second item"/>
+                    </ListBox>
+                </TabItem>
+                <TabItem Header="Unrelated tab"/>
+            </TabControl>
+            <TextBox x:Name="RefusingKeyboardTarget" Text="Focus refused" Width="120" Height="24"
+                     PreviewGotKeyboardFocus="RefuseKeyboardFocus"/>
+            <StackPanel Width="100">
+                <ComboBox x:Name="EditableKeyboardComboBox" IsEditable="True" Text="RT0303" Width="100" Height="24"
+                          Tag="0" KeyDown="EditableComboKeyDown"/>
+                <TextBlock x:Name="RenderedInlineTextTarget" Tag="0" TextWrapping="Wrap"><Run Text="{Binding UserName}"/><Run Text=" joined" MouseLeftButtonDown="RenderedInlineClicked"/></TextBlock>
+            </StackPanel>
+            <Border><TextBlock x:Name="NoKeyboardContainerTarget" Text="No focusable container"/></Border>
+            <focusFixture:SimpleTabHeader x:Name="NamespaceTypeImpostor" Content="Namespace selector fixture"/>
+        </StackPanel>
     </Grid>
 </Window>

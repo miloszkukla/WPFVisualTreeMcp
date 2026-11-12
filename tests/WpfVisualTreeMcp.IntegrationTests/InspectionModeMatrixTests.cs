@@ -9,7 +9,7 @@ using Xunit.Sdk;
 
 namespace WpfVisualTreeMcp.IntegrationTests;
 
-public class InspectionModeMatrixTests
+public partial class InspectionModeMatrixTests
 {
     private const uint Th32csSnapModule = 0x00000008;
     private const uint Th32csSnapModule32 = 0x00000010;
@@ -71,7 +71,7 @@ public class InspectionModeMatrixTests
             Path.GetTempPath(),
             $"WpfVisualTreeMcp-{Guid.NewGuid():N}");
         Directory.CreateDirectory(screenshotDirectory);
-        using var sample = StartSample(samplePath, mode);
+        using var sample = StartSample(samplePath, mode, architecture);
         try
         {
             await WaitForMainWindowAsync(sample, TimeSpan.FromSeconds(30));
@@ -151,6 +151,56 @@ public class InspectionModeMatrixTests
             submitButton.GetProperty("handle").GetString().Should().StartWith("elem_");
             findJson.RootElement.GetProperty("count").GetInt32().Should().Be(1);
 
+            var identity = await RunCliAsync(new[] { "identity", "--pid", sample.Id.ToString(), "--compact" }, TimeSpan.FromSeconds(15));
+            identity.ExitCode.Should().Be(0, FormatCommandFailure("identity", identity));
+            using var identityJson = JsonDocument.Parse(identity.StandardOutput);
+            var generation = identityJson.RootElement.GetProperty("generation").GetString()!;
+            identityJson.RootElement.GetProperty("processId").GetInt32().Should().Be(sample.Id);
+            var read = await RunCliAsync(new[] { "read", "--pid", sample.Id.ToString(), "--handle", submitButton.GetProperty("handle").GetString()!,
+                "--path", "Content", "--generation", generation, "--compact" }, TimeSpan.FromSeconds(15));
+            read.ExitCode.Should().Be(0, FormatCommandFailure("read", read));
+            using var readJson = JsonDocument.Parse(read.StandardOutput);
+            readJson.RootElement.GetProperty("generation").GetString().Should().Be(generation);
+            readJson.RootElement.GetProperty("data").GetProperty("value").GetString().Should().NotBeNullOrEmpty();
+            var stale = await RunCliAsync(new[] { "read", "--pid", sample.Id.ToString(), "--handle", submitButton.GetProperty("handle").GetString()!,
+                "--path", "Content", "--generation", "previous-inspector", "--compact" }, TimeSpan.FromSeconds(15));
+            stale.ExitCode.Should().NotBe(0);
+            stale.StandardOutput.Should().Contain("Stale inspection generation");
+
+            foreach (var selector in new[] { "SubmitButton", "NoMatchingButton" })
+            {
+                var reacquire = await RunCliAsync(new[] { "reacquire", "--pid", sample.Id.ToString(), "--name", selector, "--compact" }, TimeSpan.FromSeconds(15));
+                reacquire.ExitCode.Should().Be(0, FormatCommandFailure("reacquire", reacquire));
+                using var reacquireJson = JsonDocument.Parse(reacquire.StandardOutput);
+                reacquireJson.RootElement.GetProperty("generation").GetString().Should().Be(generation);
+                reacquireJson.RootElement.GetProperty("unique").GetBoolean().Should().Be(selector == "SubmitButton");
+                reacquireJson.RootElement.GetProperty("ambiguous").GetBoolean().Should().BeFalse();
+                reacquireJson.RootElement.GetProperty("matches").GetProperty("elements").GetArrayLength().Should().Be(selector == "SubmitButton" ? 1 : 0);
+            }
+            var ambiguous = await RunCliAsync(new[] { "reacquire", "--pid", sample.Id.ToString(), "--type", "Button", "--compact" }, TimeSpan.FromSeconds(15));
+            ambiguous.ExitCode.Should().Be(0, FormatCommandFailure("ambiguous reacquire", ambiguous));
+            using var ambiguousJson = JsonDocument.Parse(ambiguous.StandardOutput);
+            ambiguousJson.RootElement.GetProperty("unique").GetBoolean().Should().BeFalse();
+            ambiguousJson.RootElement.GetProperty("ambiguous").GetBoolean().Should().BeTrue();
+            ambiguousJson.RootElement.GetProperty("matches").GetProperty("elements").GetArrayLength().Should().BeGreaterThan(1);
+            var diagnostics = await RunCliAsync(new[] { "diagnostics", "--pid", sample.Id.ToString(), "--handle", submitButton.GetProperty("handle").GetString()!,
+                "--fields", "NoMatchingClrProperty", "--compact" }, TimeSpan.FromSeconds(30));
+            diagnostics.ExitCode.Should().Be(0, FormatCommandFailure("diagnostics", diagnostics));
+            using var diagnosticsJson = JsonDocument.Parse(diagnostics.StandardOutput);
+            diagnosticsJson.RootElement.GetProperty("generation").GetString().Should().Be(generation);
+            diagnosticsJson.RootElement.GetProperty("tree").GetProperty("totalElements").GetInt32().Should().BeGreaterThan(0);
+            diagnosticsJson.RootElement.GetProperty("properties").GetProperty("properties").EnumerateArray()
+                .Single(property => property.GetProperty("name").GetString() == "Content").GetProperty("value").GetString().Should().Be("Submit");
+            diagnosticsJson.RootElement.GetProperty("bindings").GetProperty("bindings").EnumerateArray()
+                .Single(binding => binding.GetProperty("path").GetString() == "SubmitCommand").GetProperty("status").GetString().Should().Be("Active");
+            diagnosticsJson.RootElement.GetProperty("screenshot").GetProperty("imageBase64").GetString().Should().NotBeNullOrEmpty();
+            using var diagnosticModel = JsonDocument.Parse(diagnosticsJson.RootElement.GetProperty("dataContext").GetProperty("json").GetString()!);
+            diagnosticModel.RootElement.GetProperty("value").GetProperty("NoMatchingClrProperty").GetProperty("missing").GetBoolean().Should().BeTrue();
+
+            await VerifyExactSelectorsAsync(sample.Id);
+            await VerifyRenderedTextAsync(sample.Id);
+            await VerifyKeyboardFocusAsync(sample.Id);
+
             var listBoxHandle = await FindElementHandleAsync(
                 sample.Id, "ItemsListBox", TimeSpan.FromSeconds(15));
             var select = await RunCliAsync(
@@ -210,7 +260,7 @@ public class InspectionModeMatrixTests
         }
     }
 
-    private static Process StartSample(string samplePath, string mode)
+    private static Process StartSample(string samplePath, string mode, string architecture)
     {
         var startInfo = new ProcessStartInfo
         {
@@ -219,8 +269,119 @@ public class InspectionModeMatrixTests
         };
         startInfo.Environment["WPF_VISUAL_TREE_MCP_SELF_HOSTED"] =
             mode == "SelfHosted" ? "true" : "false";
+        if (architecture == "x86")
+        {
+            var runtimeRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "dotnet");
+            startInfo.Environment["DOTNET_ROOT"] = runtimeRoot;
+            startInfo.Environment["DOTNET_ROOT_X86"] = runtimeRoot;
+            startInfo.Environment["DOTNET_ROOT(x86)"] = runtimeRoot;
+        }
 
         return Process.Start(startInfo) ?? throw new XunitException($"Failed to start {samplePath}.");
+    }
+
+    private static async Task VerifyExactSelectorsAsync(int processId)
+    {
+        var exact = await RunCliAsync(new[] { "find", "--pid", processId.ToString(), "--filter", "{\"$type\":\"TabControl\"}", "--compact" }, TimeSpan.FromSeconds(15));
+        exact.ExitCode.Should().Be(0, FormatCommandFailure("exact type", exact));
+        using var exactJson = JsonDocument.Parse(exact.StandardOutput);
+        var tabs = exactJson.RootElement.GetProperty("elements");
+        tabs.GetArrayLength().Should().Be(1);
+        tabs[0].GetProperty("name").GetString().Should().Be("FocusSafetyTabs");
+
+        var fuzzy = await RunCliAsync(new[] { "find", "--pid", processId.ToString(), "--type", "TabControl", "--compact" }, TimeSpan.FromSeconds(15));
+        fuzzy.ExitCode.Should().Be(0, FormatCommandFailure("legacy fuzzy type", fuzzy));
+        using var fuzzyJson = JsonDocument.Parse(fuzzy.StandardOutput);
+        fuzzyJson.RootElement.GetProperty("elements").EnumerateArray().Should().Contain(item => item.GetProperty("name").GetString() == "NamespaceTypeImpostor");
+
+        var automation = await RunCliAsync(new[] { "find", "--pid", processId.ToString(), "--filter", "{\"$type\":\"System.Windows.Controls.Primitives.ButtonBase\",\"$automationId\":\"SubmitButtonExact\"}", "--compact" }, TimeSpan.FromSeconds(15));
+        automation.ExitCode.Should().Be(0, FormatCommandFailure("exact automation identity", automation));
+        using var automationJson = JsonDocument.Parse(automation.StandardOutput);
+        automationJson.RootElement.GetProperty("count").GetInt32().Should().Be(1);
+        automationJson.RootElement.GetProperty("elements")[0].GetProperty("name").GetString().Should().Be("SubmitButton");
+
+        var prefix = await RunCliAsync(new[] { "find", "--pid", processId.ToString(), "--filter", "{\"$automationId\":\"SubmitButton\"}", "--compact" }, TimeSpan.FromSeconds(15));
+        prefix.ExitCode.Should().Be(0, FormatCommandFailure("automation prefix rejection", prefix));
+        using var prefixJson = JsonDocument.Parse(prefix.StandardOutput);
+        prefixJson.RootElement.GetProperty("count").GetInt32().Should().Be(0);
+    }
+
+    private static async Task VerifyKeyboardFocusAsync(int processId)
+    {
+        var tab = await FindElementHandleAsync(processId, "FocusSafetyFirstTab", TimeSpan.FromSeconds(10));
+        var target = await FindElementHandleAsync(processId, "NonFocusableKeyboardTarget", TimeSpan.FromSeconds(10));
+        var list = await FindElementHandleAsync(processId, "KeyboardFocusList", TimeSpan.FromSeconds(10));
+        var tabs = await FindElementHandleAsync(processId, "FocusSafetyTabs", TimeSpan.FromSeconds(10));
+        var focusTab = await RunCliAsync(new[] { "send-keys", "--pid", processId.ToString(), "--handle", tab, "--keys", "Home", "--compact" }, TimeSpan.FromSeconds(15));
+        focusTab.ExitCode.Should().Be(0, FormatCommandFailure("focus first tab", focusTab));
+        var right = await RunCliAsync(new[] { "send-keys", "--pid", processId.ToString(), "--handle", target, "--keys", "Right", "--compact" }, TimeSpan.FromSeconds(15));
+        right.ExitCode.Should().Be(0, FormatCommandFailure("nonfocusable content arrow", right));
+        (await ReadSelectedIndexAsync(processId, list)).Should().Be(1, "the arrow should reach the nearest ListBoxItem container");
+        (await ReadSelectedIndexAsync(processId, tabs)).Should().Be(0, "the arrow must not navigate the previously focused tab bar");
+        foreach (var name in new[] { "RefusingKeyboardTarget", "NoKeyboardContainerTarget" })
+        {
+            var invalidTarget = await FindElementHandleAsync(processId, name, TimeSpan.FromSeconds(10));
+            var refused = await RunCliAsync(new[] { "send-keys", "--pid", processId.ToString(), "--handle", invalidTarget, "--keys", "Right", "--compact" }, TimeSpan.FromSeconds(15));
+            refused.ExitCode.Should().NotBe(0, "unverified focus must reject OS keyboard input");
+            refused.StandardOutput.Should().Contain("no keys were sent");
+            (await ReadSelectedIndexAsync(processId, list)).Should().Be(1);
+            (await ReadSelectedIndexAsync(processId, tabs)).Should().Be(0);
+        }
+        var combo = await FindElementHandleAsync(processId, "EditableKeyboardComboBox", TimeSpan.FromSeconds(10));
+        var enter = await RunCliAsync(new[] { "send-keys", "--pid", processId.ToString(), "--handle", combo, "--keys", "Enter", "--compact" }, TimeSpan.FromSeconds(15));
+        enter.ExitCode.Should().Be(0, FormatCommandFailure("editable ComboBox Enter", enter));
+        var readCombo = await RunCliAsync(new[] { "read", "--pid", processId.ToString(), "--handle", combo, "--fields", "Tag,IsKeyboardFocusWithin", "--compact" }, TimeSpan.FromSeconds(15));
+        readCombo.ExitCode.Should().Be(0, FormatCommandFailure("editable ComboBox focus", readCombo));
+        using var comboJson = JsonDocument.Parse(readCombo.StandardOutput);
+        var values = comboJson.RootElement.GetProperty("data").GetProperty("value");
+        values.GetProperty("Tag").GetProperty("value").GetInt32().Should().Be(1);
+        values.GetProperty("IsKeyboardFocusWithin").GetProperty("value").GetBoolean().Should().BeTrue();
+    }
+
+    private static async Task VerifyRenderedTextAsync(int processId)
+    {
+        var source = await FindElementHandleAsync(processId, "UserNameTextBox", TimeSpan.FromSeconds(10));
+        var text = await FindElementHandleAsync(processId, "RenderedInlineTextTarget", TimeSpan.FromSeconds(10));
+        var set = await RunCliAsync(new[] { "set-text", "--pid", processId.ToString(), "--handle", source, "--text", "Native inline", "--compact" }, TimeSpan.FromSeconds(15));
+        set.ExitCode.Should().Be(0, FormatCommandFailure("set bound inline source", set));
+        var read = await RunCliAsync(new[] { "read", "--pid", processId.ToString(), "--handle", text, "--fields", "Text,$renderedText,$textLayout", "--compact" }, TimeSpan.FromSeconds(15));
+        read.ExitCode.Should().Be(0, FormatCommandFailure("read rendered inline text", read));
+        using var readJson = JsonDocument.Parse(read.StandardOutput);
+        readJson.RootElement.GetProperty("data").GetProperty("value").GetProperty("$renderedText").GetProperty("value").GetString().Should().Be("Native inline joined");
+        var find = await RunCliAsync(new[] { "find", "--pid", processId.ToString(), "--root", text, "--text", "Native inline joined", "--filter", "{\"$type\":\"TextBlock\"}", "--compact" }, TimeSpan.FromSeconds(15));
+        find.ExitCode.Should().Be(0, FormatCommandFailure("find rendered inline text", find));
+        using var findJson = JsonDocument.Parse(find.StandardOutput);
+        findJson.RootElement.GetProperty("count").GetInt32().Should().Be(1);
+        findJson.RootElement.GetProperty("elements")[0].GetProperty("text").GetString().Should().Be("Native inline joined");
+        var layout = readJson.RootElement.GetProperty("data").GetProperty("value").GetProperty("$textLayout").GetProperty("value");
+        layout.GetProperty("visible").GetBoolean().Should().BeTrue();
+        layout.GetProperty("truncated").GetBoolean().Should().BeFalse();
+        layout.GetProperty("deadlineReached").GetBoolean().Should().BeFalse();
+        var character = layout.GetProperty("runs").EnumerateArray().SelectMany(run => run.GetProperty("characters").EnumerateArray())
+            .Single(item => item.GetProperty("offset").GetInt32() == "Native inline ".Length);
+        character.GetProperty("visible").GetBoolean().Should().BeTrue();
+        var previousDpi = SetThreadDpiAwarenessContext(new IntPtr(-4));
+        previousDpi.Should().NotBe(IntPtr.Zero);
+        try
+        {
+            SetCursorPos((int)Math.Round(character.GetProperty("x").GetDouble() + character.GetProperty("width").GetDouble() / 2),
+                (int)Math.Round(character.GetProperty("y").GetDouble() + character.GetProperty("height").GetDouble() / 2)).Should().BeTrue();
+            mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
+            mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
+        }
+        finally { SetThreadDpiAwarenessContext(previousDpi); }
+        var clicked = await RunCliAsync(new[] { "read", "--pid", processId.ToString(), "--handle", text, "--fields", "Tag", "--compact" }, TimeSpan.FromSeconds(15));
+        clicked.ExitCode.Should().Be(0, FormatCommandFailure("read actual inline click", clicked));
+        using var clickedJson = JsonDocument.Parse(clicked.StandardOutput);
+        clickedJson.RootElement.GetProperty("data").GetProperty("value").GetProperty("Tag").GetProperty("value").ToString().Should().Be("1", clicked.StandardOutput);
+    }
+
+    private static async Task<int> ReadSelectedIndexAsync(int processId, string handle)
+    {
+        var read = await RunCliAsync(new[] { "read", "--pid", processId.ToString(), "--handle", handle, "--fields", "SelectedIndex", "--compact" }, TimeSpan.FromSeconds(15));
+        read.ExitCode.Should().Be(0, FormatCommandFailure("read selection", read));
+        using var result = JsonDocument.Parse(read.StandardOutput);
+        return result.RootElement.GetProperty("data").GetProperty("value").GetProperty("SelectedIndex").GetProperty("value").GetInt32();
     }
 
     private static async Task WaitForMainWindowAsync(Process process, TimeSpan timeout)
@@ -502,4 +663,8 @@ public class InspectionModeMatrixTests
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool CloseHandle(IntPtr handle);
+
+    [DllImport("user32.dll")] private static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll")] private static extern void mouse_event(uint flags, uint x, uint y, uint data, UIntPtr extraInfo);
+    [DllImport("user32.dll")] private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
 }

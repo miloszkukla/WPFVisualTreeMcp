@@ -24,6 +24,7 @@ public static class CliRunner
         "styles", "watch-property", "highlight", "click", "select-item", "set-text",
         "send-keys", "wait-for", "set-property", "revert-property", "snapshot", "diff",
         "evaluate-binding", "explain-triggers", "layout", "export", "screenshot",
+        "identity", "read", "members", "reacquire", "diagnostics",
     };
 
     /// <summary>Options that never take a value (presence alone is meaningful).</summary>
@@ -94,6 +95,44 @@ public static class CliRunner
                         mainWindowHandle = session.MainWindowHandle,
                         inspectorStatus = session.InspectorStatus,
                     }, cli);
+                    break;
+                }
+
+                case "identity":
+                {
+                    await AttachAsync(processManager, cli, false);
+                    WriteJson(await bridge.GetInspectionIdentityAsync(), cli);
+                    break;
+                }
+
+                case "read":
+                case "members":
+                {
+                    await AttachAsync(processManager, cli, false);
+                    var response = await bridge.ReadClrAsync(cli.GetRequired("handle"), cli.GetStringOrNull("path") ?? "",
+                        (cli.GetStringOrNull("fields") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries),
+                        cli.GetInt("skip", 0), cli.GetInt("take", 50), cli.GetStringOrNull("generation"), command == "members");
+                    using var payload = JsonDocument.Parse(response.Json ?? "{}");
+                    WriteJson(new { response.Generation, response.ProcessId, data = payload.RootElement.Clone() }, cli);
+                    break;
+                }
+
+                case "reacquire":
+                {
+                    await AttachAsync(processManager, cli, false);
+                    var identity = await bridge.GetInspectionIdentityAsync();
+                    var matches = await bridge.FindElementsAsync(null, cli.GetStringOrNull("type"), cli.GetStringOrNull("name"),
+                        cli.GetStringOrNull("text"), ParseFilter(cli.GetStringOrNull("filter")), cli.Flags.Contains("visible-only"), 200);
+                    WriteJson(new { identity.Generation, identity.ProcessId, unique = matches.Count == 1, ambiguous = matches.Count > 1, matches }, cli);
+                    break;
+                }
+
+                case "diagnostics":
+                {
+                    await AttachAsync(processManager, cli, false);
+                    var tools = new WpfTools(processManager, bridge);
+                    WriteJson(await tools.WpfDiagnosticCapture(cli.GetRequired("handle"),
+                        (cli.GetStringOrNull("fields") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)), cli);
                     break;
                 }
 
@@ -529,6 +568,11 @@ COMMANDS
   binding-errors        --pid
   clear-binding-errors  --pid
   data-context  --pid --handle H
+  identity      --pid
+  read          --pid --handle H [--path P] [--fields 'Code,CodeStatus'] [--skip N] [--take N] [--generation G]
+  members       --pid --handle H [--path P] [--skip N] [--take N] [--generation G]
+  reacquire     --pid [--type T] [--name N] [--text S]
+  diagnostics   --pid --handle H [--fields 'Count,SelectedItem']
   resources     --pid [--scope application|element] [--handle H]
   styles        --pid --handle H
   watch-property        --pid --handle H --property P
@@ -588,6 +632,11 @@ TYPICAL WORKFLOW
             "clear-binding-errors" => "clear-binding-errors --pid <id>\n  Reset the captured binding-error list.",
             "data-context" => "data-context --pid <id> --handle <handle>\n"
                             + "  Inspect the DataContext and its inheritance chain.",
+            "identity" => "identity --pid <id>\n  Read process identity and Inspector generation.",
+            "read" => "read --pid <id> --handle <handle> [--path <property.path>] [--fields 'Code,CodeStatus'] [--skip <n>] [--take <n>] [--generation <id>]\n  Read bounded CLR values without executing methods.",
+            "members" => "members --pid <id> --handle <handle> [--path <property.path>] [--skip <n>] [--take <n>] [--generation <id>]\n  Discover public CLR members without evaluating getters.",
+            "reacquire" => "reacquire --pid <id> [--type <type>] [--name <name>] [--text <text>]\n  Return candidates and report ambiguity.",
+            "diagnostics" => "diagnostics --pid <id> --handle <handle> [--fields 'Count,SelectedItem']\n  Collect a bounded compound diagnostic snapshot.",
             "resources" => "resources --pid <id> [--scope application|element] [--handle <handle>]\n"
                          + "  Enumerate resource dictionaries. --handle required when --scope is 'element'.",
             "styles" => "styles --pid <id> --handle <handle>\n  Show applied styles and templates for an element.",

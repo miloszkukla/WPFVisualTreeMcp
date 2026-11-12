@@ -1,4 +1,5 @@
 using WpfVisualTreeMcp.Shared.Models;
+using WpfVisualTreeMcp.Shared.Ipc;
 
 namespace WpfVisualTreeMcp.Server.Services;
 
@@ -7,6 +8,9 @@ namespace WpfVisualTreeMcp.Server.Services;
 /// </summary>
 public interface IIpcBridge
 {
+    Task<ClrReadResponse> GetInspectionIdentityAsync();
+    Task<ClrReadResponse> ReadClrAsync(string elementHandle, string path, string[] fields, int skip, int take, string? generation, bool membersOnly = false);
+
     /// <summary>
     /// Gets the visual tree from the attached process.
     /// </summary>
@@ -160,4 +164,18 @@ public interface IIpcBridge
     /// is null, the keys go to whatever currently has keyboard focus.
     /// </summary>
     Task<SendKeysResult> SendKeysAsync(string? elementHandle, string keys);
+
+    /// <summary>
+    /// Scrolls the exact ScrollViewer on its UI dispatcher without keyboard focus.
+    /// The result confirms the action was issued; layout may still be pending.
+    /// </summary>
+    Task<ScrollViewerResult> ScrollViewerAsync(string elementHandle, ScrollViewerAction action,
+        string? generation = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Scrolls an item of the exact ListBox into view without changing selection.
+    /// The result confirms the action was issued; layout may still be pending.
+    /// </summary>
+    Task<ScrollViewerResult> ScrollItemIntoViewAsync(string listHandle, int index,
+        string? generation = null, CancellationToken cancellationToken = default);
 }

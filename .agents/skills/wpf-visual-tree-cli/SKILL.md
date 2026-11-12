@@ -83,6 +83,8 @@ wpfinspect help
 
 4. Inspect from broad to narrow: `tree` or `find`, then `props`, `bindings`, `data-context`, `styles`, `layout`, `evaluate-binding`, or `explain-triggers`. Use returned `elem_...` handles only while the target process and element remain alive.
 
+   For CLR values use `identity`, then `read` with an explicit path, selected fields and bounded paging. Use `members` for signatures before assuming a property or method exists. Pass the returned generation when reusing a handle; use `reacquire` with selectors after restart and inspect ambiguous matches. `diagnostics` combines a bounded subtree, properties, bindings, requested DataContext fields and a rendered screenshot. See the CLI reference for syntax.
+
 5. Prefer `wait-for` over sleep-and-retry loops. Use `select-item` instead of clicking virtualized ComboBox/ListBox/ListView/TabControl entries.
 
 6. Keep stdout machine-readable. Add `--compact` for parsing and `--verbose` only when diagnostics on stderr are needed.

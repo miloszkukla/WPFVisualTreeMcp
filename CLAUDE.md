@@ -125,8 +125,21 @@ The Inspector strips UTF-8 BOM (0xEF 0xBB 0xBF) before JSON parsing to prevent d
   `text` (visible text content — button captions, TextBlock text, window title, tooltip,
   AutomationProperties.Name; aggregated from shallow descendants), `property_filter`
   (property name → value substring), `visible_only`
+- Optional `property_filter` identities use ordinal equality: `$type` matches an exact
+  CLR short/full name along the class/base hierarchy; `$automationId` matches the
+  attached AutomationProperties.AutomationId. The existing fuzzy filters are unchanged.
 - Results include `text`, `automationId`, `isVisible`, `isEnabled` and `screenBounds`
   (device pixels, same space as the OS mouse)
+- TextBlock search text includes its rendered Run/Span inlines. Explicit CLR reads
+  may project `$renderedText` for a TextBlock to obtain that same TextRange string;
+  ordinary `Text` still reads the original CLR property, and existing string bounds apply.
+- `$textLayout` on a TextBlock projects its rendered text and inline runs with UTF-16
+  offsets and character rectangles in device screen pixels. Glyph visibility respects
+  ancestor clipping. Reads stop at 4096 characters, 200 runs or 500 ms and report
+  `truncated`/`deadlineReached`; callers must reject incomplete or nonvisible geometry.
+  `windowHandle` identifies the current HwndSource for activation/occlusion checks.
+  Clients sending physical input must use a temporary per-monitor-aware thread DPI
+  context so Windows does not virtualize those device-pixel coordinates.
 - Default `max_depth` is 25 (configurable 1-100)
 
 ### Screenshot Capture
@@ -232,6 +245,9 @@ shell call. No MCP handshake required; `--help` is self-documenting.
     The response reports the value read back after the write.
   - `send-keys` — OS-level keyboard input; modifiers `Ctrl/Shift/Alt/Win` plus
     letters, digits, F1-F12, and named keys.
+    A supplied nonfocusable element uses its nearest enabled, visible, focusable
+    ancestor container. Unverified/refused focus rejects input before any key is sent;
+    it does not fall back to unrelated focus elsewhere in the window.
   - The first four live in `ControlInteractor`; property edits use `PropertyWriter`.
 
 ### Typical CLI workflow

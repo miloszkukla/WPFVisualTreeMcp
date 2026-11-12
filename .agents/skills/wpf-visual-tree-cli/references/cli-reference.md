@@ -165,3 +165,10 @@ After self-hosting, run `attach` without `--auto-inject`.
 - Repository: <https://github.com/faze79/WPFVisualTreeMcp>
 - NuGet tool: <https://www.nuget.org/packages/WpfVisualTreeMcp>
 - CLI implementation for v0.12.0: <https://github.com/faze79/WPFVisualTreeMcp/blob/v0.12.0/src/WpfVisualTreeMcp.Server/Cli/CliRunner.cs>
+# Bounded CLR observations
+
+`identity` returns the Inspector generation and process identity. Use `read --handle H --path DataContext.Items --fields Code,Status --skip 0 --take 50 --generation G` for selected values/collection projections, and `members --handle H --path DataContext` for metadata without invoking methods. Keep the returned generation with handles; stale generations require reacquisition.
+
+`reacquire --type T --name N --text S` returns candidate matches and reports ambiguity. `diagnostics --handle H --fields Field1,Field2` combines a bounded subtree, properties, bindings, selected DataContext values and screenshot, preserving per-part errors. These are read-oriented commands; no arbitrary expression or method execution is supported.
+
+Reacquisition candidates are in `matches.elements`, with `matches.count` and top-level `unique`/`ambiguous` flags. Diagnostic `properties` and `bindings` retain their existing result shapes; projected CLR values and field errors are inside `dataContext.json`.

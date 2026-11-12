@@ -9,6 +9,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
+using System.Windows.Interop;
 using System.Windows.Media;
 
 namespace WpfVisualTreeMcp.Inspector;
@@ -32,7 +33,7 @@ public class FindCriteria
     /// </summary>
     public string? Text { get; set; }
 
-    /// <summary>Property name → expected value (case-insensitive substring match on the value's ToString()).</summary>
+    /// <summary>Property name → expected value (case-insensitive substring match); $type and $automationId use exact ordinal identity.</summary>
     public Dictionary<string, string>? PropertyFilter { get; set; }
 
     /// <summary>When true, only elements that are currently visible on screen are returned.</summary>
@@ -63,6 +64,14 @@ public class TreeWalker
     private readonly ConditionalWeakTable<DependencyObject, string> _handleCache = new();
     private readonly Dictionary<string, WeakReference<DependencyObject>> _handleLookup = new();
     private int _handleCounter;
+
+    private sealed class ElementReferenceComparer : IEqualityComparer<DependencyObject>
+    {
+        public bool Equals(DependencyObject? x, DependencyObject? y) => ReferenceEquals(x, y);
+        public int GetHashCode(DependencyObject obj) => RuntimeHelpers.GetHashCode(obj);
+    }
+
+    private static readonly IEqualityComparer<DependencyObject> ElementComparer = new ElementReferenceComparer();
 
     public int HandleCacheCount => _handleLookup.Count;
 
@@ -284,22 +293,7 @@ public class TreeWalker
     /// <returns>JSON array of matching elements.</returns>
     public string FindElements(DependencyObject root, FindCriteria criteria, int maxResults = 50)
     {
-        // Clamp maxResults to reasonable limit to prevent memory issues
-        if (maxResults > 10000) maxResults = 10000;
-        if (maxResults < 1) maxResults = 1;
-
-        var results = new List<string>();
-        FindElementsRecursive(root, criteria, results, maxResults);
-
-        var sb = new StringBuilder();
-        sb.Append("{\"elements\":[");
-        for (int i = 0; i < results.Count; i++)
-        {
-            if (i > 0) sb.Append(",");
-            sb.Append(results[i]);
-        }
-        sb.Append($"],\"count\":{results.Count}}}");
-        return sb.ToString();
+        return FindElementsAcrossRoots(new[] { root }, criteria, maxResults);
     }
 
     /// <summary>
@@ -311,11 +305,24 @@ public class TreeWalker
     /// <returns>JSON array of matching elements.</returns>
     public string FindElementsDeep(DependencyObject root, FindCriteria criteria, int maxResults = 100000)
     {
-        if (maxResults > 100000) maxResults = 100000;
+        return FindElementsAcrossRoots(new[] { root }, criteria, maxResults, true);
+    }
+
+    /// <summary>Searches roots once per element, including overlapping popup trees.</summary>
+    public string FindElementsAcrossRoots(IEnumerable<DependencyObject> roots, FindCriteria criteria, int maxResults = 50, bool deep = false)
+    {
+        // Apply one result bound across all windows and popup HWNDs.
+        var limit = deep ? 100000 : 10000;
+        if (maxResults > limit) maxResults = limit;
         if (maxResults < 1) maxResults = 1;
 
         var results = new List<string>();
-        FindElementsRecursive(root, criteria, results, maxResults);
+        var visited = new HashSet<DependencyObject>(ElementComparer);
+        foreach (var root in roots)
+        {
+            FindElementsRecursive(root, criteria, results, maxResults, visited);
+            if (results.Count >= maxResults) break;
+        }
 
         var sb = new StringBuilder();
         sb.Append("{\"elements\":[");
@@ -324,7 +331,9 @@ public class TreeWalker
             if (i > 0) sb.Append(",");
             sb.Append(results[i]);
         }
-        sb.Append($"],\"count\":{results.Count},\"truncated\":{(results.Count >= maxResults).ToString().ToLower()}}}");
+        sb.Append($"],\"count\":{results.Count}");
+        if (deep) sb.Append($",\"truncated\":{(results.Count >= maxResults).ToString().ToLower()}");
+        sb.Append("}");
         return sb.ToString();
     }
 
@@ -425,16 +434,18 @@ public class TreeWalker
     /// </summary>
     public (string Handle, string TypeName)? FindFirstMatch(FindCriteria criteria)
     {
+        var visited = new HashSet<DependencyObject>(ElementComparer);
         foreach (var root in GetAllSearchRoots())
         {
-            var hit = FindFirstMatchRecursive(root, criteria);
+            var hit = FindFirstMatchRecursive(root, criteria, visited);
             if (hit != null) return hit;
         }
         return null;
     }
 
-    private (string Handle, string TypeName)? FindFirstMatchRecursive(DependencyObject element, FindCriteria criteria)
+    private (string Handle, string TypeName)? FindFirstMatchRecursive(DependencyObject element, FindCriteria criteria, HashSet<DependencyObject> visited)
     {
+        if (!visited.Add(element)) return null;
         if (criteria.VisibleOnly && element is UIElement ui && !ui.IsVisible && element is not Popup)
         {
             return null;
@@ -448,15 +459,15 @@ public class TreeWalker
 
         foreach (var child in GetAllVisualChildren(element))
         {
-            var hit = FindFirstMatchRecursive(child, criteria);
+            var hit = FindFirstMatchRecursive(child, criteria, visited);
             if (hit != null) return hit;
         }
         return null;
     }
 
-    private void FindElementsRecursive(DependencyObject element, FindCriteria criteria, List<string> results, int maxResults)
+    private void FindElementsRecursive(DependencyObject element, FindCriteria criteria, List<string> results, int maxResults, HashSet<DependencyObject> visited)
     {
-        if (results.Count >= maxResults)
+        if (results.Count >= maxResults || !visited.Add(element))
         {
             return;
         }
@@ -480,7 +491,7 @@ public class TreeWalker
 
         foreach (var child in GetAllVisualChildren(element))
         {
-            FindElementsRecursive(child, criteria, results, maxResults);
+            FindElementsRecursive(child, criteria, results, maxResults, visited);
 
             if (results.Count >= maxResults)
             {
@@ -509,7 +520,7 @@ public class TreeWalker
                 return false;
         }
 
-        if (criteria.VisibleOnly && element is UIElement ui && !ui.IsVisible)
+        if (criteria.VisibleOnly && (element is Popup visiblePopup ? !visiblePopup.IsOpen : element is UIElement ui && !ui.IsVisible))
         {
             return false;
         }
@@ -525,6 +536,19 @@ public class TreeWalker
         {
             foreach (var kvp in criteria.PropertyFilter)
             {
+                if (kvp.Key == "$type")
+                {
+                    var exactType = false;
+                    for (var candidate = type; candidate != null; candidate = candidate.BaseType)
+                        if (candidate.Name == kvp.Value || candidate.FullName == kvp.Value) { exactType = true; break; }
+                    if (!exactType) return false;
+                    continue;
+                }
+                if (kvp.Key == "$automationId")
+                {
+                    if (!string.Equals(GetAutomationId(element) ?? "", kvp.Value, StringComparison.Ordinal)) return false;
+                    continue;
+                }
                 if (!PropertyValueMatches(element, kvp.Key, kvp.Value))
                     return false;
             }
@@ -677,7 +701,7 @@ public class TreeWalker
         return element switch
         {
             Window w => w.Title,
-            TextBlock tb => tb.Text,
+            TextBlock tb => GetRenderedText(tb),
             AccessText at => at.Text,
             TextBox tb => tb.Text,
             Run run => run.Text,
@@ -687,6 +711,9 @@ public class TreeWalker
             _ => null
         };
     }
+
+    internal static string GetRenderedText(TextBlock element) =>
+        new TextRange(element.ContentStart, element.ContentEnd).Text;
 
     private static void CollectDescendantText(DependencyObject element, List<string> parts, int depth, int maxDepth, int maxParts)
     {
@@ -806,6 +833,12 @@ public class TreeWalker
             }
         }
 
+        // Template popups are logical children of their layout panel, but are
+        // absent from its visual children once their content has its own HWND.
+        foreach (var child in LogicalTreeHelper.GetChildren(element))
+            if (child is Popup logicalPopup && !children.Contains(logicalPopup))
+                children.Add(logicalPopup);
+
         // Popup: traverse into the popup's separate visual tree
         if (element is Popup popup && popup.Child != null)
         {
@@ -836,13 +869,18 @@ public class TreeWalker
     public static List<DependencyObject> GetAllSearchRoots()
     {
         var roots = new List<DependencyObject>();
+        var seen = new HashSet<DependencyObject>(ElementComparer);
         var app = Application.Current;
-        if (app == null) return roots;
-
-        foreach (Window window in app.Windows)
+        if (app != null && app.CheckAccess())
         {
-            roots.Add(window);
+            foreach (Window window in app.Windows)
+                if (window.CheckAccess() && seen.Add(window)) roots.Add(window);
         }
+
+        // ToolTip and context-menu HWNDs are not members of Application.Windows.
+        foreach (PresentationSource presentation in PresentationSource.CurrentSources)
+            if (presentation is HwndSource source && source.CheckAccess() && !source.IsDisposed && source.Handle != IntPtr.Zero &&
+                source.RootVisual is { } root && root.CheckAccess() && seen.Add(root)) roots.Add(root);
 
         return roots;
     }

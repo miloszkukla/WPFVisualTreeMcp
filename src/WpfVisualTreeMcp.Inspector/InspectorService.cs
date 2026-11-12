@@ -13,7 +13,7 @@ namespace WpfVisualTreeMcp.Inspector;
 /// <summary>
 /// Main entry point for the inspector when loaded into a WPF application.
 /// </summary>
-public class InspectorService : IDisposable
+public partial class InspectorService : IDisposable
 {
     private static readonly TimeSpan FullContentCaptureTimeout = TimeSpan.FromSeconds(25);
     private readonly IpcServer _ipcServer;
@@ -278,11 +278,16 @@ public class InspectorService : IDisposable
         {
             DebugLog($"HandleRequestAsync: requestType={requestType}");
 
+            if (requestType == "InspectionIdentity") return HandleInspectionIdentity();
+
             if (Application.Current == null)
             {
                 DebugLog("ERROR: Application.Current is NULL!");
                 return new GetVisualTreeResponse { Success = false, Error = "Application.Current is null" };
             }
+
+            if (requestType == "ScrollViewer") return await HandleScrollViewerAsync(data);
+            if (requestType == "ScrollItemIntoView") return await HandleScrollItemIntoViewAsync(data);
 
             // WaitForElement polls over time: it must NOT run inside a single blocking
             // Dispatcher.Invoke (that would freeze the UI so the condition can never
@@ -356,6 +361,7 @@ public class InspectorService : IDisposable
         {
             "GetVisualTree" => HandleGetVisualTree(data),
             "GetElementProperties" => HandleGetElementProperties(data),
+            "ReadClr" => HandleReadClr(data),
             "FindElements" => HandleFindElements(data),
             "FindElementsDeep" => HandleFindElementsDeep(data),
             "GetBindings" => HandleGetBindings(data),
@@ -500,40 +506,13 @@ public class InspectorService : IDisposable
             return new FindElementsResponse { Success = false, Error = "No root element found" };
         }
 
-        // Search each window, accumulating results
-        var allResults = new System.Text.StringBuilder();
-        allResults.Append("{\"elements\":[");
-        int totalCount = 0;
-        bool first = true;
-
-        foreach (var root in allRoots)
-        {
-            if (totalCount >= maxResults) break;
-            var json = _treeWalker.FindElements(root, criteria, maxResults - totalCount);
-            var count = ParseJsonCount(json);
-            if (count > 0)
-            {
-                // Extract elements array content from {"elements":[...],"count":N}
-                var elemStart = json.IndexOf('[') + 1;
-                var elemEnd = json.LastIndexOf(']');
-                if (elemStart > 0 && elemEnd > elemStart)
-                {
-                    if (!first) allResults.Append(",");
-                    first = false;
-                    allResults.Append(json.Substring(elemStart, elemEnd - elemStart));
-                    totalCount += count;
-                }
-            }
-        }
-
-        allResults.Append($"],\"count\":{totalCount}}}");
-        var resultJson = allResults.ToString();
+        var resultJson = _treeWalker.FindElementsAcrossRoots(allRoots, criteria, maxResults);
 
         return new FindElementsResponse
         {
             RequestId = request?.RequestId ?? "",
             ElementsJson = resultJson,
-            Count = totalCount
+            Count = ParseJsonCount(resultJson)
         };
     }
 
@@ -569,37 +548,13 @@ public class InspectorService : IDisposable
             return new FindElementsDeepResponse { Success = false, Error = "No root element found" };
         }
 
-        var allResults = new System.Text.StringBuilder();
-        allResults.Append("{\"elements\":[");
-        int totalCount = 0;
-        bool first = true;
-
-        foreach (var root in allRoots)
-        {
-            var json = _treeWalker.FindElementsDeep(root, criteria);
-            var count = ParseJsonCount(json);
-            if (count > 0)
-            {
-                var elemStart = json.IndexOf('[') + 1;
-                var elemEnd = json.LastIndexOf(']');
-                if (elemStart > 0 && elemEnd > elemStart)
-                {
-                    if (!first) allResults.Append(",");
-                    first = false;
-                    allResults.Append(json.Substring(elemStart, elemEnd - elemStart));
-                    totalCount += count;
-                }
-            }
-        }
-
-        allResults.Append($"],\"count\":{totalCount},\"truncated\":false}}");
-        var resultJson = allResults.ToString();
+        var resultJson = _treeWalker.FindElementsAcrossRoots(allRoots, criteria, 100000, true);
 
         return new FindElementsDeepResponse
         {
             RequestId = request?.RequestId ?? "",
             ElementsJson = resultJson,
-            Count = totalCount
+            Count = ParseJsonCount(resultJson)
         };
     }
 

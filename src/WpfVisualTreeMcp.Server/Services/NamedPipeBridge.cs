@@ -11,7 +11,7 @@ namespace WpfVisualTreeMcp.Server.Services;
 /// Implementation of IPC bridge using named pipes.
 /// Communicates with the Inspector DLL injected into the target WPF process.
 /// </summary>
-public class NamedPipeBridge : IIpcBridge
+public partial class NamedPipeBridge : IIpcBridge
 {
     private readonly ILogger<NamedPipeBridge> _logger;
     private readonly IProcessManager _processManager;
@@ -644,7 +644,8 @@ public class NamedPipeBridge : IIpcBridge
         };
     }
 
-    private async Task<TResponse> SendRequestAsync<TRequest, TResponse>(int processId, TRequest request)
+    private async Task<TResponse> SendRequestAsync<TRequest, TResponse>(int processId, TRequest request,
+        CancellationToken cancellationToken = default)
         where TRequest : IpcRequest
         where TResponse : IpcResponse, new()
     {
@@ -677,16 +678,18 @@ public class NamedPipeBridge : IIpcBridge
             using var pipeClient = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut,
                 PipeOptions.Asynchronous);
 
-            using var cts = new CancellationTokenSource(_connectionTimeout);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(_connectionTimeout);
             await pipeClient.ConnectAsync(cts.Token);
 
             using var reader = new StreamReader(pipeClient, Encoding.UTF8, leaveOpen: true);
             await using var writer = new StreamWriter(pipeClient, Encoding.UTF8, leaveOpen: true) { AutoFlush = true };
 
             var requestJson = IpcSerializer.SerializeRequest(request);
-            await writer.WriteLineAsync(requestJson);
+            await writer.WriteLineAsync(requestJson.AsMemory(), cancellationToken);
 
-            using var readCts = new CancellationTokenSource(_requestTimeout);
+            using var readCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            readCts.CancelAfter(_requestTimeout);
             var responseJson = await reader.ReadLineAsync(readCts.Token);
 
             if (string.IsNullOrEmpty(responseJson))
@@ -696,6 +699,10 @@ public class NamedPipeBridge : IIpcBridge
 
             var response = IpcSerializer.DeserializeResponse<TResponse>(responseJson);
             return response ?? new TResponse { Success = false, Error = "Failed to parse response" };
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (TimeoutException)
         {
@@ -989,7 +996,7 @@ public class NamedPipeBridge : IIpcBridge
                         Mode = binding.TryGetProperty("mode", out var mode) ? mode.GetString() ?? "" : "",
                         UpdateTrigger = binding.TryGetProperty("updateTrigger", out var trigger) ? trigger.GetString() ?? "" : "",
                         Status = binding.TryGetProperty("status", out var status) ? status.GetString() ?? "" : "",
-                        CurrentValue = binding.TryGetProperty("currentValue", out var val) ? val.GetString() : null
+                        CurrentValue = binding.TryGetProperty("currentValue", out var val) && val.ValueKind != JsonValueKind.Null ? val.ToString() : null
                     });
                 }
             }

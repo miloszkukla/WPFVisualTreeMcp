@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
@@ -10,6 +11,8 @@ using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Media;
+using WpfVisualTreeMcp.Shared.Models;
 
 namespace WpfVisualTreeMcp.Inspector;
 
@@ -392,7 +395,7 @@ internal sealed class ControlInteractor
         var (modifiers, key) = KeyComboParser.Parse(keys);
 
         if (element != null)
-            FocusForKeyboardInput(element);
+            FocusForSendKeys(element);
 
         foreach (var modifier in modifiers)
             NativeMethods.KeyDown(modifier);
@@ -405,6 +408,49 @@ internal sealed class ControlInteractor
             NativeMethods.KeyUp(modifier);
 
         return new InteractionOutcome("Physical", $"sent '{keys}'");
+    }
+
+    // ---------------------------------------------------------------------
+    // ScrollViewer
+    // ---------------------------------------------------------------------
+
+    public InteractionOutcome ScrollItemIntoView(ListBox list, int index,
+        CancellationToken cancellationToken = default)
+    {
+        list.Dispatcher.VerifyAccess();
+        EnsureInteractable(list, "scrolled");
+        if (index < 0 || index >= list.Items.Count)
+            throw new ArgumentOutOfRangeException(nameof(index), index, "ListBox item index is out of range.");
+        cancellationToken.ThrowIfCancellationRequested();
+        list.ScrollIntoView(list.Items[index]);
+        return new InteractionOutcome("ListBox.ScrollIntoView", $"Issued once for item {index}; layout may still be pending.");
+    }
+
+    public InteractionOutcome ScrollViewer(ScrollViewer element, ScrollViewerAction action,
+        CancellationToken cancellationToken = default)
+    {
+        element.Dispatcher.VerifyAccess();
+        EnsureInteractable(element, "scrolled");
+        cancellationToken.ThrowIfCancellationRequested();
+        switch (action)
+        {
+            case ScrollViewerAction.Home:
+                element.ScrollToVerticalOffset(0);
+                break;
+            case ScrollViewerAction.PageDown:
+                element.PageDown();
+                break;
+            case ScrollViewerAction.PageUp:
+                element.PageUp();
+                break;
+            case ScrollViewerAction.End:
+                element.ScrollToVerticalOffset(element.ScrollableHeight);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(action), action, "Invalid ScrollViewer action.");
+        }
+
+        return new InteractionOutcome($"ScrollViewer.{action}", "Issued once on the UI dispatcher; layout may still be pending.");
     }
 
     // ---------------------------------------------------------------------
@@ -430,6 +476,35 @@ internal sealed class ControlInteractor
         var focused = element.Focus();
         Keyboard.Focus(element);
         return focused;
+    }
+
+    private static void FocusForSendKeys(UIElement element)
+    {
+        var window = Window.GetWindow(element);
+        window?.Activate();
+        if (window == null || !window.IsActive)
+            throw new InvalidOperationException("The target window could not accept keyboard focus; no keys were sent.");
+
+        ScrollIntoView(element);
+        for (DependencyObject? current = element; current != null;)
+        {
+            // A broad window scope must not reuse focus in an unrelated tab/control.
+            if (current is Window && !ReferenceEquals(current, element))
+                break;
+            if (current is UIElement candidate && candidate.Focusable && candidate.IsEnabled && candidate.IsVisible)
+            {
+                candidate.Focus();
+                Keyboard.Focus(candidate);
+                var focused = Keyboard.FocusedElement as DependencyObject;
+                if (candidate.IsKeyboardFocusWithin && focused != null &&
+                    (ReferenceEquals(focused, candidate) || candidate.IsAncestorOf(focused)))
+                    return;
+                throw new InvalidOperationException("The target container refused keyboard focus; no keys were sent.");
+            }
+            var parent = current is Visual ? VisualTreeHelper.GetParent(current) : null;
+            current = parent ?? (current as FrameworkElement)?.Parent;
+        }
+        throw new InvalidOperationException("The target has no enabled visible focusable keyboard container; no keys were sent.");
     }
 
     // ---------------------------------------------------------------------

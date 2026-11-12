@@ -10,7 +10,7 @@ namespace WpfVisualTreeMcp.Server;
 /// WPF Visual Tree inspection tools for MCP
 /// </summary>
 [McpServerToolType]
-public class WpfTools
+public partial class WpfTools
 {
     private readonly IProcessManager _processManager;
     private readonly IIpcBridge _ipcBridge;
