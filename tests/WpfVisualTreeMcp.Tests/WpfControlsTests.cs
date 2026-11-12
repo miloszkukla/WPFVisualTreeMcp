@@ -131,12 +131,46 @@ public class WpfControlsTests
     {
         var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
         transport.Setup(x => x.FindAsync(null, "Grid", null, null, null, true, 10000)).ReturnsAsync("grid");
-        transport.Setup(x => x.InspectAsync("bindings", "grid", "", ""))
+        transport.Setup(x => x.BindingsAsync("grid"))
             .ReturnsAsync(JsonSerializer.SerializeToElement(new { path = "QsFilterModulesFound" }));
         var grid = await new WpfControls(transport.Object).FindAsync<Grid>();
 
         (await grid.BindingsAsync()).GetProperty("path").GetString().Should().Be("QsFilterModulesFound");
         transport.VerifyAll();
+    }
+
+    [Fact]
+    public async Task PropertiesAndRuntimeTypeUseDedicatedInspectionMethods()
+    {
+        var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
+        transport.Setup(x => x.FindAsync(null, "Grid", null, null, null, true, 10000)).ReturnsAsync("grid");
+        transport.Setup(x => x.PropertiesAsync("grid"))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { Name = "Example" }));
+        transport.Setup(x => x.TreeAsync("grid"))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { Root = new { TypeName = "Example.Grid" } }));
+        var grid = await new WpfControls(transport.Object).FindAsync<Grid>();
+
+        (await grid.PropertiesAsync()).GetProperty("Name").GetString().Should().Be("Example");
+        (await grid.RuntimeTypeNameAsync()).Should().Be("Example.Grid");
+        transport.VerifyAll();
+    }
+
+    [Fact]
+    public async Task FailedObservationsRecordTheCallingMethodAndDistinctSearchStep()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "WpfSessionTrace-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var session = new WpfSession(Environment.ProcessId, directory);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => session.TreeAsync());
+            await Assert.ThrowsAsync<InvalidOperationException>(() => session.SearchAsync("handle", "text"));
+
+            var operations = File.ReadAllLines(Path.Combine(directory, "commands.jsonl"))
+                .Select(line => JsonSerializer.Deserialize<JsonElement>(line).GetProperty("operation").GetString()).ToArray();
+            operations.Should().Equal("TreeAsync", "SetTextAsync");
+        }
+        finally { Directory.Delete(directory, true); }
     }
 
     [Fact]

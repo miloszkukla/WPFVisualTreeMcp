@@ -23,7 +23,9 @@ public interface IWpfControlTransport
     Task<bool> IsTypeAsync(string handle, string type);
     Task<(string Handle, string? Name, string? Text, string? AutomationId)[]> FindAllAsync(string? type, string? name, string? text, string? root, bool visibleOnly);
     Task<JsonElement> ReadAsync(string handle, string path, string fields);
-    Task<JsonElement> InspectAsync(string operation, string? handle = null, string path = "", string fields = "");
+    Task<JsonElement> TreeAsync(string? handle = null);
+    Task<JsonElement> PropertiesAsync(string handle);
+    Task<JsonElement> BindingsAsync(string handle);
     Task<string> RenderedTextAsync(string handle);
     Task ClickAsync(string handle, bool physical, string? clickType);
     Task SetTextAsync(string handle, string text);
@@ -127,9 +129,9 @@ public class WpfElement : IEquatable<WpfElement>
     public Task WaitForStableBoundsAsync() => Owner.Transport.WaitForStableBoundsAsync(Handle);
     public Task<string> RenderedTextAsync() => Owner.Transport.RenderedTextAsync(Handle);
     public Task<JsonElement> ReadAsync(string path, string fields) => Owner.Transport.ReadAsync(Handle, path, fields);
-    public Task<JsonElement> BindingsAsync() => Owner.Transport.InspectAsync("bindings", Handle);
-    public Task<JsonElement> PropertiesAsync() => Owner.Transport.InspectAsync("props", Handle);
-    public async Task<string?> RuntimeTypeNameAsync() => (await Owner.Transport.InspectAsync("tree", Handle)).GetProperty("Root").GetProperty("TypeName").GetString();
+    public Task<JsonElement> BindingsAsync() => Owner.Transport.BindingsAsync(Handle);
+    public Task<JsonElement> PropertiesAsync() => Owner.Transport.PropertiesAsync(Handle);
+    public async Task<string?> RuntimeTypeNameAsync() => (await Owner.Transport.TreeAsync(Handle)).GetProperty("Root").GetProperty("TypeName").GetString();
     public Task SetPropertyAsync(string property, string value) => Owner.Transport.SetPropertyAsync(Handle, property, value);
 
     public async Task<T?> PropertyAsync<T>(string property)

@@ -27,3 +27,7 @@ public sealed class MyCustomControl(WpfElement element) : UserControl(element)
 ```
 
 Use the actual target type name and appropriate WPF base class. Every concrete proxy must declare its own `[WpfType]` and expose a public constructor accepting a `WpfElement`. A proxy belongs to the session that found it and cannot be used as a search root in another session. Inspector-generation and process identity checks still apply to each transport operation; reacquire elements after an application or inspector restart. Application model properties can be read with `ReadAsync` when needed, while control-specific methods expose common WPF operations.
+
+For raw diagnostics, `WpfSession` exposes `IdentityAsync`, `TreeAsync`, `PropertiesAsync`, `BindingsAsync`, `BindingErrorsAsync`, `LayoutAsync`, `MembersAsync` and `ReadAsync`. Control proxies also provide scoped `PropertiesAsync` and `BindingsAsync` methods.
+
+The session records observations in `commands.jsonl`, using the session method name as the `operation` label. Methods that perform multiple inspector actions record the relevant action names separately.

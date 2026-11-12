@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging.Abstractions;
 using WpfVisualTreeMcp.Server.Controls;
 using WpfVisualTreeMcp.Server.Services;
@@ -38,7 +39,7 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
         return criteria;
     }
 
-    private async Task<T> ObserveAsync<T>(string operation, object? arguments, Func<Task<T>> action)
+    private async Task<T> ObserveAsync<T>(object? arguments, Func<Task<T>> action, [CallerMemberName] string operation = "")
     {
         var timer = Stopwatch.StartNew();
         try
@@ -77,11 +78,11 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
         using var target = Process.GetProcessById(ProcessId);
         if (target.SessionId != Process.GetCurrentProcess().SessionId)
             throw new InvalidOperationException("Run this test in the same interactive Windows session as the application.");
-        var session = await ObserveAsync("attach", new { ProcessId }, () => processManager.AttachToProcessAsync(ProcessId, null, autoInject: true));
+        var session = await ObserveAsync(new { ProcessId }, () => processManager.AttachToProcessAsync(ProcessId, null, autoInject: true));
         if (session.InspectorStatus?.StartsWith("Loaded (", StringComparison.Ordinal) != true)
             throw new InvalidOperationException("Inspector attach failed for PID " + ProcessId + ": " + session.InspectorStatus);
         bridge = new NamedPipeBridge(NullLogger<NamedPipeBridge>.Instance, processManager);
-        var identity = await ObserveAsync("identity", null, Bridge.GetInspectionIdentityAsync);
+        var identity = await ObserveAsync(null, Bridge.GetInspectionIdentityAsync, nameof(IdentityAsync));
         if (!identity.Success || string.IsNullOrEmpty(identity.Generation))
             throw new InvalidOperationException(identity.Error ?? "Inspector did not return its identity.");
         generation = identity.Generation;
@@ -90,7 +91,7 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
     public async Task<string> FindAsync(string automationId, string type, string? root = null)
     {
         // Narrow by type/root, then match the returned AutomationId exactly.
-        var result = await ObserveAsync("find", new { automationId, type, root }, () =>
+        var result = await ObserveAsync(new { automationId, type, root }, () =>
             Bridge.FindElementsAsync(root, null, null, null, ExactCriteria(automationId, type), visibleOnly: true, maxResults: 200));
         if (result.Count >= 200)
             throw new InvalidOperationException($"Narrow the search for {automationId}; candidate limit reached.");
@@ -102,7 +103,7 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
 
     public async Task<JsonElement> ReadAsync(string handle, string path, string fields)
     {
-        var response = await ObserveAsync("read", new { handle, path, fields }, () =>
+        var response = await ObserveAsync(new { handle, path, fields }, () =>
             Bridge.ReadClrAsync(handle, path, fields.Split(','), 0, 200, generation));
         using var json = JsonDocument.Parse(response.Json ?? throw new InvalidOperationException("Inspector returned no CLR data."));
         return json.RootElement.Clone();
@@ -122,7 +123,7 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
         var member = projection.GetProperty("$renderedText");
         if (member.TryGetProperty("missing", out var missing) && missing.GetBoolean())
         {
-            var textBlocks = await ObserveAsync("rendered-text-type", new { handle }, () =>
+            var textBlocks = await ObserveAsync(new { handle }, () =>
                 Bridge.FindElementsAsync(handle, null, null, null, ExactCriteria(null, "TextBlock"), false, 1));
             if (textBlocks.Elements.Any(element => element.Handle == handle))
                 throw new InvalidOperationException("This TextBlock inspector payload lacks rendered text support; restart the target after deployment.");
@@ -135,17 +136,17 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
     }
 
     public async Task SelectItemAsync(string handle, string text) =>
-        await ObserveAsync("select-item", new { handle, text }, () => Bridge.SelectItemAsync(handle, text, null));
+        await ObserveAsync(new { handle, text }, () => Bridge.SelectItemAsync(handle, text, null));
 
     public async Task SearchAsync(string handle, string text)
     {
-        await ObserveAsync("set-text", new { handle, text }, () => Bridge.SetTextAsync(handle, text, physical: false));
-        await ObserveAsync("send-keys", new { handle, keys = "Enter" }, () => Bridge.SendKeysAsync(handle, "Enter"));
+        await ObserveAsync(new { handle, text }, () => Bridge.SetTextAsync(handle, text, physical: false), nameof(SetTextAsync));
+        await ObserveAsync(new { handle, keys = "Enter" }, () => Bridge.SendKeysAsync(handle, "Enter"), nameof(SendKeysAsync));
     }
 
     public async Task ScreenshotAsync(string path)
     {
-        await ObserveAsync("screenshot", new { path }, async () =>
+        await ObserveAsync(new { path }, async () =>
         {
             var shot = await Bridge.CaptureScreenshotAsync(null, 1920, 1080, mode: "screen");
             if (string.IsNullOrEmpty(shot.ImageBase64))
@@ -161,7 +162,7 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
         var timer = Stopwatch.StartNew();
         do
         {
-            var result = await ObserveAsync("find-control", new { automationId, type, name, text, root }, () =>
+            var result = await ObserveAsync(new { automationId, type, name, text, root }, () =>
                 Bridge.FindElementsAsync(root, null, name, text, ExactCriteria(automationId, type), visibleOnly, 200));
             if (result.Count >= 200) throw new InvalidOperationException("Selector reached the candidate limit; narrow its scope.");
             var matches = result.Elements.Where(element => (automationId == null || element.AutomationId == automationId)
@@ -176,25 +177,25 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
     }
 
     public async Task ClickAsync(string handle, string? clickType = null) =>
-        await ObserveAsync("click", new { handle, clickType }, () => Bridge.ClickElementAsync(handle, false, clickType));
+        await ObserveAsync(new { handle, clickType }, () => Bridge.ClickElementAsync(handle, false, clickType));
 
     public async Task PhysicalClickAsync(string handle, string? clickType = null) =>
-        await ObserveAsync("physical-click", new { handle, clickType }, () => Bridge.ClickElementAsync(handle, true, clickType));
+        await ObserveAsync(new { handle, clickType }, () => Bridge.ClickElementAsync(handle, true, clickType));
 
     public async Task<(string Handle, string? Name, string? Text, string? AutomationId)[]> FindControlsAsync(string? type = null,
         string? name = null, string? text = null, string? root = null, bool visibleOnly = true)
     {
-        var result = await ObserveAsync("find-controls", new { type, name, text, root }, () => Bridge.FindElementsAsync(root, null, name, text, ExactCriteria(null, type), visibleOnly, 200));
+        var result = await ObserveAsync(new { type, name, text, root }, () => Bridge.FindElementsAsync(root, null, name, text, ExactCriteria(null, type), visibleOnly, 200));
         if (result.Count >= 200) throw new InvalidOperationException("The candidate limit was reached; narrow the search.");
         return result.Elements.Where(element => name == null || element.Name == name).Select(element => (element.Handle, element.Name, element.Text, element.AutomationId)).ToArray();
     }
 
     public async Task SetTextAsync(string handle, string text) =>
-        await ObserveAsync("set-text", new { handle, text }, () => Bridge.SetTextAsync(handle, text, false));
+        await ObserveAsync(new { handle, text }, () => Bridge.SetTextAsync(handle, text, false));
 
     public async Task HoverAsync(string handle)
     {
-        var found = await ObserveAsync("hover-bounds", new { handle }, () => Bridge.FindElementsAsync(handle, null, null, null, null, true, 1));
+        var found = await ObserveAsync(new { handle }, () => Bridge.FindElementsAsync(handle, null, null, null, null, true, 1));
         var element = found.Elements.SingleOrDefault(item => item.Handle == handle);
         var bounds = element?.ScreenBounds ?? throw new InvalidOperationException("Target has no visible screen bounds: " + handle);
         if (!SetCursorPos((int)(bounds.X + bounds.Width / 2), (int)(bounds.Y + bounds.Height / 2))) throw new InvalidOperationException("Could not move the pointer to the target.");
@@ -214,7 +215,7 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
         string? previous = null;
         do
         {
-            var result = await ObserveAsync("stable-bounds", new { handle }, () => Bridge.FindElementsAsync(handle, null, null, null, null, true, 1));
+            var result = await ObserveAsync(new { handle }, () => Bridge.FindElementsAsync(handle, null, null, null, null, true, 1));
             var bounds = result.Elements.SingleOrDefault(element => element.Handle == handle)?.ScreenBounds;
             var current = bounds != null && bounds.Width > 0 && bounds.Height > 0 ? JsonSerializer.Serialize(bounds) : null;
             if (current != null && current == previous) { Waiting?.Invoke(null); return; }
@@ -229,31 +230,41 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
     [DllImport("user32.dll")] private static extern void mouse_event(uint flags, uint x, uint y, uint data, UIntPtr extraInfo);
 
     public async Task SendKeysAsync(string handle, string keys) =>
-        await ObserveAsync("send-keys", new { handle, keys }, () => Bridge.SendKeysAsync(handle, keys));
+        await ObserveAsync(new { handle, keys }, () => Bridge.SendKeysAsync(handle, keys));
 
     public async Task ScrollViewerAsync(string handle, ScrollViewerAction action) =>
-        await ObserveAsync("scroll-viewer", new { handle, action }, () => Bridge.ScrollViewerAsync(handle, action, generation, CancellationToken));
+        await ObserveAsync(new { handle, action }, () => Bridge.ScrollViewerAsync(handle, action, generation, CancellationToken));
 
     public async Task ScrollItemIntoViewAsync(string handle, int index) =>
-        await ObserveAsync("scroll-item-into-view", new { handle, index }, () => Bridge.ScrollItemIntoViewAsync(handle, index, generation, CancellationToken));
+        await ObserveAsync(new { handle, index }, () => Bridge.ScrollItemIntoViewAsync(handle, index, generation, CancellationToken));
 
     public async Task SetPropertyAsync(string handle, string property, string value) =>
-        await ObserveAsync("set-property", new { handle, property, value }, () => Bridge.SetPropertyAsync(handle, property, value));
+        await ObserveAsync(new { handle, property, value }, () => Bridge.SetPropertyAsync(handle, property, value));
 
-    public async Task<JsonElement> InspectAsync(string operation, string? handle = null, string path = "", string fields = "")
+    public Task<JsonElement> IdentityAsync() =>
+        ObserveInspectionAsync(null, "", async () => await Bridge.GetInspectionIdentityAsync());
+
+    public Task<JsonElement> TreeAsync(string? handle = null) =>
+        ObserveInspectionAsync(handle, "", async () => await Bridge.GetVisualTreeAsync(handle, 3));
+
+    public Task<JsonElement> PropertiesAsync(string handle) =>
+        ObserveInspectionAsync(handle, "", async () => await Bridge.GetElementPropertiesAsync(handle ?? throw new ArgumentException("A handle is required.")));
+
+    public Task<JsonElement> BindingsAsync(string handle) =>
+        ObserveInspectionAsync(handle, "", async () => await Bridge.GetBindingsAsync(handle ?? throw new ArgumentException("A handle is required.")));
+
+    public Task<JsonElement> BindingErrorsAsync() =>
+        ObserveInspectionAsync(null, "", async () => await Bridge.GetBindingErrorsAsync());
+
+    public Task<JsonElement> LayoutAsync(string handle) =>
+        ObserveInspectionAsync(handle, "", async () => await Bridge.GetLayoutInfoAsync(handle ?? throw new ArgumentException("A handle is required.")));
+
+    public Task<JsonElement> MembersAsync(string? handle, string path = "") =>
+        ObserveInspectionAsync(handle, path, async () => await Bridge.ReadClrAsync(handle!, path, [], 0, 50, generation, true));
+
+    private async Task<JsonElement> ObserveInspectionAsync(string? handle, string path, Func<Task<object>> action, [CallerMemberName] string operation = "")
     {
-        if (operation == "read") return await ReadAsync(handle ?? throw new ArgumentException("A handle is required."), path, fields);
-        var result = await ObserveAsync<object>(operation, new { handle, path, fields }, async () => operation switch
-        {
-            "identity" => await Bridge.GetInspectionIdentityAsync(),
-            "tree" => await Bridge.GetVisualTreeAsync(handle, 3),
-            "props" => await Bridge.GetElementPropertiesAsync(handle ?? throw new ArgumentException("A handle is required.")),
-            "bindings" => await Bridge.GetBindingsAsync(handle ?? throw new ArgumentException("A handle is required.")),
-            "binding-errors" => await Bridge.GetBindingErrorsAsync(),
-            "layout" => await Bridge.GetLayoutInfoAsync(handle ?? throw new ArgumentException("A handle is required.")),
-            "members" => await Bridge.ReadClrAsync(handle!, path, [], 0, 50, generation, true),
-            _ => throw new ArgumentException("Unknown library observation: " + operation)
-        });
+        var result = await ObserveAsync(new { handle, path, fields = "" }, action, operation);
         return JsonSerializer.SerializeToElement(result);
     }
 
@@ -262,7 +273,7 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
 
     async Task<bool> IWpfControlTransport.IsTypeAsync(string handle, string type)
     {
-        var result = await ObserveAsync("verify-control-type", new { handle, type }, () =>
+        var result = await ObserveAsync(new { handle, type }, () =>
             Bridge.FindElementsAsync(handle, null, null, null, ExactCriteria(null, type), false, 1));
         return result.Elements.Any(element => element.Handle == handle);
     }
