@@ -23,9 +23,9 @@ public interface IWpfControlTransport
     Task<bool> IsTypeAsync(string handle, string type);
     Task<(string Handle, string? Name, string? Text, string? AutomationId)[]> FindAllAsync(string? type, string? name, string? text, string? root, bool visibleOnly);
     Task<JsonElement> ReadAsync(string handle, string path, string fields);
-    Task<JsonElement> TreeAsync(string? handle = null);
-    Task<JsonElement> PropertiesAsync(string handle);
-    Task<JsonElement> BindingsAsync(string handle);
+    Task<JsonElement> GetTreeAsync(string? handle = null);
+    Task<JsonElement> GetPropertiesAsync(string handle);
+    Task<JsonElement> GetBindingsAsync(string handle);
     Task<string> RenderedTextAsync(string handle);
     Task ClickAsync(string handle, bool physical, string? clickType);
     Task SetTextAsync(string handle, string text);
@@ -139,7 +139,7 @@ public class WpfElement : IEquatable<WpfElement>
     public async Task<bool> HasNoEffectAsync() => WpfSession.Value((await ReadAsync("", "Effect")).GetProperty("value"), "Effect").ValueKind == JsonValueKind.Null;
     public async Task<string?> EffectTypeNameAsync() => WpfSession.Value((await ReadAsync("", "Effect")).GetProperty("value"), "Effect").GetProperty("type").GetString();
     public Task<JsonElement> ReadAsync(string path, string fields) => Owner.Transport.ReadAsync(Handle, path, fields);
-    public Task<JsonElement> BindingsAsync() => Owner.Transport.BindingsAsync(Handle);
+    public Task<JsonElement> BindingsAsync() => Owner.Transport.GetBindingsAsync(Handle);
     public async Task<bool> BindingContainsAsync(string expected) => ContainsString(await BindingsAsync(), expected);
 
     private static bool ContainsString(JsonElement value, string expected) => value.ValueKind switch
@@ -171,8 +171,8 @@ public class WpfElement : IEquatable<WpfElement>
         return ObservedText.FromProjection(value);
     }
     public async Task<BindingInfo[]> BindingInfoAsync() => (await BindingsAsync()).GetProperty("Bindings").EnumerateArray().Select(binding => new BindingInfo(binding)).ToArray();
-    public Task<JsonElement> PropertiesAsync() => Owner.Transport.PropertiesAsync(Handle);
-    public async Task<string?> RuntimeTypeNameAsync() => (await Owner.Transport.TreeAsync(Handle)).GetProperty("Root").GetProperty("TypeName").GetString();
+    public Task<JsonElement> PropertiesAsync() => Owner.Transport.GetPropertiesAsync(Handle);
+    public async Task<string?> RuntimeTypeNameAsync() => (await Owner.Transport.GetTreeAsync(Handle)).GetProperty("Root").GetProperty("TypeName").GetString();
     public Task SetPropertyAsync(string property, string value) => Owner.Transport.SetPropertyAsync(Handle, property, value);
 
     public async Task<T?> PropertyAsync<T>(string property)

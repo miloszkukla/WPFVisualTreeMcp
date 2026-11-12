@@ -131,7 +131,7 @@ public class WpfControlsTests
     {
         var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
         transport.Setup(x => x.FindAsync(null, "Grid", null, null, null, true, 10000)).ReturnsAsync("grid");
-        transport.Setup(x => x.BindingsAsync("grid"))
+        transport.Setup(x => x.GetBindingsAsync("grid"))
             .ReturnsAsync(JsonSerializer.SerializeToElement(new { path = "QsFilterModulesFound" }));
         var grid = await new WpfControls(transport.Object).FindAsync<Grid>();
 
@@ -144,9 +144,9 @@ public class WpfControlsTests
     {
         var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
         transport.Setup(x => x.FindAsync(null, "Grid", null, null, null, true, 10000)).ReturnsAsync("grid");
-        transport.Setup(x => x.PropertiesAsync("grid"))
+        transport.Setup(x => x.GetPropertiesAsync("grid"))
             .ReturnsAsync(JsonSerializer.SerializeToElement(new { Name = "Example" }));
-        transport.Setup(x => x.TreeAsync("grid"))
+        transport.Setup(x => x.GetTreeAsync("grid"))
             .ReturnsAsync(JsonSerializer.SerializeToElement(new { Root = new { TypeName = "Example.Grid" } }));
         var grid = await new WpfControls(transport.Object).FindAsync<Grid>();
 
@@ -163,12 +163,12 @@ public class WpfControlsTests
         try
         {
             var session = new WpfSession(Environment.ProcessId, directory);
-            await Assert.ThrowsAsync<InvalidOperationException>(() => session.TreeAsync());
+            await Assert.ThrowsAsync<InvalidOperationException>(() => session.GetTreeAsync());
             await Assert.ThrowsAsync<InvalidOperationException>(() => session.SearchAsync("handle", "text"));
 
             var operations = File.ReadAllLines(Path.Combine(directory, "commands.jsonl"))
                 .Select(line => JsonSerializer.Deserialize<JsonElement>(line).GetProperty("operation").GetString()).ToArray();
-            operations.Should().Equal("TreeAsync", "SetTextAsync");
+            operations.Should().Equal("GetTreeAsync", "SetTextAsync");
         }
         finally { Directory.Delete(directory, true); }
     }
@@ -456,7 +456,7 @@ public class WpfControlsTests
     {
         var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
         transport.Setup(x => x.FindAsync(null, "Button", null, null, null, true, 10000)).ReturnsAsync("button");
-        transport.Setup(x => x.BindingsAsync("button")).ReturnsAsync(JsonSerializer.SerializeToElement(new { Bindings = new[] { new { Details = new[] { "Parent", "Exact.Path" } } } }));
+        transport.Setup(x => x.GetBindingsAsync("button")).ReturnsAsync(JsonSerializer.SerializeToElement(new { Bindings = new[] { new { Details = new[] { "Parent", "Exact.Path" } } } }));
         var button = await new WpfControls(transport.Object).FindAsync<Button>();
 
         (await button.BindingContainsAsync("Exact.Path")).Should().BeTrue();

@@ -82,7 +82,7 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
         if (session.InspectorStatus?.StartsWith("Loaded (", StringComparison.Ordinal) != true)
             throw new InvalidOperationException("Inspector attach failed for PID " + ProcessId + ": " + session.InspectorStatus);
         bridge = new NamedPipeBridge(NullLogger<NamedPipeBridge>.Instance, processManager);
-        var identity = await ObserveAsync(null, Bridge.GetInspectionIdentityAsync, nameof(IdentityAsync));
+        var identity = await ObserveAsync(null, Bridge.GetInspectionIdentityAsync, nameof(GetIdentityAsync));
         if (!identity.Success || string.IsNullOrEmpty(identity.Generation))
             throw new InvalidOperationException(identity.Error ?? "Inspector did not return its identity.");
         generation = identity.Generation;
@@ -241,25 +241,25 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
     public async Task SetPropertyAsync(string handle, string property, string value) =>
         await ObserveAsync(new { handle, property, value }, () => Bridge.SetPropertyAsync(handle, property, value));
 
-    public Task<JsonElement> IdentityAsync() =>
+    public Task<JsonElement> GetIdentityAsync() =>
         ObserveInspectionAsync(null, "", async () => await Bridge.GetInspectionIdentityAsync());
 
-    public Task<JsonElement> TreeAsync(string? handle = null) =>
+    public Task<JsonElement> GetTreeAsync(string? handle = null) =>
         ObserveInspectionAsync(handle, "", async () => await Bridge.GetVisualTreeAsync(handle, 3));
 
-    public Task<JsonElement> PropertiesAsync(string handle) =>
+    public Task<JsonElement> GetPropertiesAsync(string handle) =>
         ObserveInspectionAsync(handle, "", async () => await Bridge.GetElementPropertiesAsync(handle ?? throw new ArgumentException("A handle is required.")));
 
-    public Task<JsonElement> BindingsAsync(string handle) =>
+    public Task<JsonElement> GetBindingsAsync(string handle) =>
         ObserveInspectionAsync(handle, "", async () => await Bridge.GetBindingsAsync(handle ?? throw new ArgumentException("A handle is required.")));
 
-    public Task<JsonElement> BindingErrorsAsync() =>
+    public Task<JsonElement> GetBindingErrorsAsync() =>
         ObserveInspectionAsync(null, "", async () => await Bridge.GetBindingErrorsAsync());
 
-    public Task<JsonElement> LayoutAsync(string handle) =>
+    public Task<JsonElement> GetLayoutAsync(string handle) =>
         ObserveInspectionAsync(handle, "", async () => await Bridge.GetLayoutInfoAsync(handle ?? throw new ArgumentException("A handle is required.")));
 
-    public Task<JsonElement> MembersAsync(string? handle, string path = "") =>
+    public Task<JsonElement> GetMembersAsync(string? handle, string path = "") =>
         ObserveInspectionAsync(handle, path, async () => await Bridge.ReadClrAsync(handle!, path, [], 0, 50, generation, true));
 
     private async Task<JsonElement> ObserveInspectionAsync(string? handle, string path, Func<Task<object>> action, [CallerMemberName] string operation = "")
