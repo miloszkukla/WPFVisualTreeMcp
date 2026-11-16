@@ -27,7 +27,7 @@ public interface IWpfControlTransport
     Task<JsonElement> GetPropertiesAsync(string handle);
     Task<JsonElement> GetBindingsAsync(string handle);
     Task<string> RenderedTextAsync(string handle);
-    Task ClickAsync(string handle, bool physical, string? clickType);
+    Task ClickAsync(string handle, bool physical, ClickType? clickType);
     Task SetTextAsync(string handle, string text);
     Task SelectItemAsync(string handle, string text);
     Task SendKeysAsync(string handle, string keys);
@@ -121,8 +121,8 @@ public class WpfElement : IEquatable<WpfElement>
     public Task<T[]> FindAllAsync<T>(string? name = null, string? text = null, bool visibleOnly = true) where T : WpfElement =>
         Owner.FindAllAsync<T>(name, text, this, visibleOnly);
 
-    public Task ClickAsync(string? clickType = null) => Owner.Transport.ClickAsync(Handle, false, clickType);
-    public Task PhysicalClickAsync(string? clickType = null) => Owner.Transport.ClickAsync(Handle, true, clickType);
+    public Task ClickAsync(ClickType? clickType = null) => Owner.Transport.ClickAsync(Handle, false, clickType);
+    public Task PhysicalClickAsync(ClickType? clickType = null) => Owner.Transport.ClickAsync(Handle, true, clickType);
     public Task SendKeysAsync(string keys) => Owner.Transport.SendKeysAsync(Handle, keys);
     public Task HoverAsync() => Owner.Transport.HoverAsync(Handle);
     public Task ScrollAsync(int delta) => Owner.Transport.ScrollAsync(Handle, delta);

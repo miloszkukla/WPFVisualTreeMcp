@@ -7,6 +7,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using WpfVisualTreeMcp.Shared.Ipc;
+using ScreenshotMode = WpfVisualTreeMcp.Shared.Models.ScreenshotMode;
+using WaitCondition = WpfVisualTreeMcp.Shared.Models.WaitCondition;
 
 namespace WpfVisualTreeMcp.Inspector;
 
@@ -964,15 +966,7 @@ public partial class InspectorService : IDisposable
             return new WaitForElementResponse { Success = false, Error = "Invalid WaitForElement request" };
         }
 
-        var condition = (request.Condition ?? "visible").ToLowerInvariant();
-        if (condition != "visible" && condition != "exists" && condition != "enabled" && condition != "hidden")
-        {
-            return new WaitForElementResponse
-            {
-                Success = false,
-                Error = $"Unknown condition '{request.Condition}'. Expected: visible, exists, enabled, or hidden."
-            };
-        }
+        var condition = request.Condition;
 
         if (string.IsNullOrEmpty(request.TypeName) && string.IsNullOrEmpty(request.ElementName) && string.IsNullOrEmpty(request.Text))
         {
@@ -993,8 +987,8 @@ public partial class InspectorService : IDisposable
             TypeName = request.TypeName,
             ElementName = request.ElementName,
             Text = request.Text,
-            VisibleOnly = condition != "exists",
-            PropertyFilter = condition == "enabled"
+            VisibleOnly = condition != WaitCondition.Exists,
+            PropertyFilter = condition == WaitCondition.Enabled
                 ? new Dictionary<string, string> { ["IsEnabled"] = "True" }
                 : null
         };
@@ -1008,7 +1002,7 @@ public partial class InspectorService : IDisposable
                 System.Threading.CancellationToken.None,
                 TimeSpan.FromSeconds(10));
 
-            var satisfied = condition == "hidden" ? hit == null : hit != null;
+            var satisfied = condition == WaitCondition.Hidden ? hit == null : hit != null;
             var elapsed = (int)(DateTime.UtcNow - start).TotalMilliseconds;
 
             if (satisfied)
@@ -1174,16 +1168,8 @@ public partial class InspectorService : IDisposable
 
         try
         {
-            var mode = request?.Mode?.ToLowerInvariant() ?? "render";
-            if (mode != "render" && mode != "screen")
-            {
-                return new CaptureScreenshotResponse
-                {
-                    Success = false,
-                    Error = $"Unknown screenshot mode '{request?.Mode}'. Expected 'render' or 'screen'."
-                };
-            }
-            if (request?.FullContent == true && mode == "screen")
+            var mode = request?.Mode ?? ScreenshotMode.Render;
+            if (request?.FullContent == true && mode == ScreenshotMode.Screen)
             {
                 return new CaptureScreenshotResponse
                 {
@@ -1199,7 +1185,7 @@ public partial class InspectorService : IDisposable
             var (base64, width, height) = request?.FullContent == true
                 ? screenshotCapture.CaptureFullContent(
                     element, maxWidth, maxHeight, fullContentCaptureToken)
-                : mode == "screen"
+                : mode == ScreenshotMode.Screen
                     ? screenshotCapture.CaptureScreen(element, maxWidth, maxHeight)
                     : screenshotCapture.CaptureElement(element, maxWidth, maxHeight);
 

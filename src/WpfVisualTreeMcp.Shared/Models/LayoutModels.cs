@@ -31,9 +31,9 @@ public class LayoutInfo
     public SizeInfo RenderSize { get; set; } = new();
     public ThicknessInfo Margin { get; set; } = new();
     public ThicknessInfo? Padding { get; set; }
-    public string HorizontalAlignment { get; set; } = "Stretch";
-    public string VerticalAlignment { get; set; } = "Stretch";
-    public string Visibility { get; set; } = "Visible";
+    public HorizontalAlignment? HorizontalAlignment { get; set; }
+    public VerticalAlignment? VerticalAlignment { get; set; }
+    public Visibility? Visibility { get; set; }
 }
 
 /// <summary>

@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using WpfVisualTreeMcp.Server.Services;
+using WpfVisualTreeMcp.Shared.Models;
 
 namespace WpfVisualTreeMcp.Server.Cli;
 
@@ -17,6 +18,10 @@ namespace WpfVisualTreeMcp.Server.Cli;
 /// </summary>
 public static class CliRunner
 {
+    private static T ParseEnum<T>(string value) where T : struct, Enum =>
+        Enum.GetNames<T>().FirstOrDefault(name => string.Equals(name, value, StringComparison.OrdinalIgnoreCase)) is { } name
+            ? Enum.Parse<T>(name) : throw new ArgumentException($"Invalid {typeof(T).Name}: {value}");
+
     private static readonly string[] Commands =
     {
         "list", "attach", "tree", "props", "find", "find-deep", "bindings",
@@ -263,7 +268,7 @@ public static class CliRunner
                     var result = await bridge.ClickElementAsync(
                         cli.GetRequired("handle"),
                         cli.Flags.Contains("physical"),
-                        cli.GetStringOrNull("click-type"));
+                        cli.GetStringOrNull("click-type") is { } clickType ? ParseEnum<ClickType>(clickType) : null);
                     WriteJson(new
                     {
                         success = true,
@@ -335,7 +340,7 @@ public static class CliRunner
                         throw new ArgumentException("wait-for requires --type, --name or --text to identify the element.");
                     WriteJson(await bridge.WaitForElementAsync(
                         cli.GetStringOrNull("root"), type, name, text,
-                        cli.GetString("condition", "visible"),
+                        ParseEnum<WaitCondition>(cli.GetString("condition", "visible")),
                         cli.GetInt("timeout", 10000),
                         cli.GetInt("poll", 250)), cli);
                     break;
@@ -459,10 +464,8 @@ public static class CliRunner
                     var fullContent = cli.Flags.Contains("full-content");
                     var maxW = Math.Clamp(cli.GetInt("max-width", 1920), 1, fullContent ? 16384 : 3840);
                     var maxH = Math.Clamp(cli.GetInt("max-height", 1080), 1, fullContent ? 16384 : 2160);
-                    var shotMode = cli.GetString("mode", "render").ToLowerInvariant();
-                    if (shotMode != "render" && shotMode != "screen")
-                        throw new ArgumentException("--mode must be 'render' or 'screen'.");
-                    if (fullContent && shotMode == "screen")
+                    var shotMode = ParseEnum<ScreenshotMode>(cli.GetString("mode", "render"));
+                    if (fullContent && shotMode == ScreenshotMode.Screen)
                         throw new ArgumentException("--full-content is supported with --mode render only.");
                     var shot = await bridge.CaptureScreenshotAsync(cli.GetStringOrNull("handle"), maxW, maxH, shotMode, fullContent);
                     if (string.IsNullOrEmpty(shot.ImageBase64))

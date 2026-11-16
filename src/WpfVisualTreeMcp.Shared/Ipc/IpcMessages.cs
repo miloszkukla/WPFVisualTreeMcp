@@ -1,3 +1,5 @@
+using WpfVisualTreeMcp.Shared.Models;
+
 namespace WpfVisualTreeMcp.Shared.Ipc;
 
 /// <summary>
@@ -216,7 +218,7 @@ public class WaitForElementRequest : IpcRequest
     public string? Text { get; set; }
 
     /// <summary>"visible" (default), "exists", "enabled", or "hidden".</summary>
-    public string Condition { get; set; } = "visible";
+    public WaitCondition Condition { get; set; } = WaitCondition.Visible;
 
     public int TimeoutMs { get; set; } = 10000;
     public int PollIntervalMs { get; set; } = 250;
@@ -367,7 +369,7 @@ public class CaptureScreenshotRequest : IpcRequest
     /// covered, but cannot see Popups/menus. "screen": GDI capture of the on-screen pixels —
     /// includes open Popups, ComboBox dropdowns, context menus and tooltips.
     /// </summary>
-    public string Mode { get; set; } = "render";
+    public ScreenshotMode Mode { get; set; } = ScreenshotMode.Render;
 
     /// <summary>
     /// Capture the complete content of a ScrollViewer, including content outside
@@ -394,7 +396,7 @@ public class ClickElementRequest : IpcRequest
     public bool Physical { get; set; }
 
     /// <summary>"single" (default), "double" or "right". Double and right clicks always use the physical path.</summary>
-    public string? ClickType { get; set; }
+    public ClickType? ClickType { get; set; }
 }
 
 public class ClickElementResponse : IpcResponse

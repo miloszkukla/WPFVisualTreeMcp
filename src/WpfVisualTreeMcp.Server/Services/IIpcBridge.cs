@@ -110,7 +110,7 @@ public interface IIpcBridge
     /// ("visible", "exists", "enabled", or "hidden") or the timeout elapses.
     /// </summary>
     Task<WaitForResult> WaitForElementAsync(string? rootHandle, string? typeName, string? elementName,
-        string? text, string condition, int timeoutMs, int pollIntervalMs);
+        string? text, WaitCondition condition, int timeoutMs, int pollIntervalMs);
 
     /// <summary>
     /// Exports the visual tree in the specified format.
@@ -125,7 +125,7 @@ public interface IIpcBridge
     /// <paramref name="fullContent"/> captures all content in a ScrollViewer and
     /// is supported by render mode only.
     /// </summary>
-    Task<ScreenshotResult> CaptureScreenshotAsync(string? elementHandle, int maxWidth, int maxHeight, string mode = "render", bool fullContent = false);
+    Task<ScreenshotResult> CaptureScreenshotAsync(string? elementHandle, int maxWidth, int maxHeight, ScreenshotMode mode = ScreenshotMode.Render, bool fullContent = false);
 
     /// <summary>
     /// Gets the DataContext chain for an element.
@@ -143,7 +143,7 @@ public interface IIpcBridge
     /// <paramref name="clickType"/>: "single" (default), "double" or "right" —
     /// double/right always use the physical path.
     /// </summary>
-    Task<ClickResult> ClickElementAsync(string elementHandle, bool physical, string? clickType = null);
+    Task<ClickResult> ClickElementAsync(string elementHandle, bool physical, ClickType? clickType = null);
 
     /// <summary>
     /// Selects an item in a Selector control (ComboBox, ListBox, ListView, TabControl)

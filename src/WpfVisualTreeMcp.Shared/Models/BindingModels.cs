@@ -8,9 +8,9 @@ public class BindingInfo
     public string Property { get; set; } = string.Empty;
     public string Path { get; set; } = string.Empty;
     public string? Source { get; set; }
-    public string Mode { get; set; } = "OneWay";
-    public string? UpdateTrigger { get; set; }
-    public string Status { get; set; } = "Active";
+    public BindingMode? Mode { get; set; }
+    public UpdateSourceTrigger? UpdateTrigger { get; set; }
+    public BindingStatus? Status { get; set; }
     public string? CurrentValue { get; set; }
 }
 

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using FluentAssertions;
 using WpfVisualTreeMcp.Shared.Ipc;
+using WpfVisualTreeMcp.Shared.Models;
 using Xunit;
 
 namespace WpfVisualTreeMcp.Tests;
@@ -13,6 +14,22 @@ namespace WpfVisualTreeMcp.Tests;
 /// </summary>
 public class IpcSerializerTests
 {
+    [Fact]
+    public void InspectionEnumsReadExistingStringValuesAndRejectInvalidValues()
+    {
+        var click = IpcSerializer.DeserializeRequestData<ClickElementRequest>(JsonDocument.Parse("{\"clickType\":\"right\"}").RootElement);
+        var screenshot = IpcSerializer.DeserializeRequestData<CaptureScreenshotRequest>(JsonDocument.Parse("{\"mode\":\"screen\"}").RootElement);
+        var wait = IpcSerializer.DeserializeRequestData<WaitForElementRequest>(JsonDocument.Parse("{\"condition\":\"hidden\"}").RootElement);
+
+        click!.ClickType.Should().Be(ClickType.Right);
+        screenshot!.Mode.Should().Be(ScreenshotMode.Screen);
+        wait!.Condition.Should().Be(WaitCondition.Hidden);
+        Action unknown = () => IpcSerializer.DeserializeRequestData<ClickElementRequest>(JsonDocument.Parse("{\"clickType\":\"other\"}").RootElement);
+        Action number = () => IpcSerializer.DeserializeRequestData<CaptureScreenshotRequest>(JsonDocument.Parse("{\"mode\":1}").RootElement);
+        unknown.Should().Throw<JsonException>();
+        number.Should().Throw<JsonException>();
+    }
+
     [Fact]
     public void SerializeRequest_IncludesDerivedClassProperties()
     {
@@ -99,17 +116,17 @@ public class IpcSerializerTests
     [Fact]
     public void SerializeRequest_RoundTripsClickTypeAndScreenshotMode()
     {
-        var click = new ClickElementRequest { ElementHandle = "elem_1", ClickType = "right" };
+        var click = new ClickElementRequest { ElementHandle = "elem_1", ClickType = ClickType.Right };
         var clickJson = IpcSerializer.SerializeRequest(click);
         var clickBack = IpcSerializer.DeserializeRequestData<ClickElementRequest>(
             IpcSerializer.DeserializeRequest(clickJson)!.Value.data);
-        clickBack!.ClickType.Should().Be("right");
+        clickBack!.ClickType.Should().Be(ClickType.Right);
 
-        var shot = new CaptureScreenshotRequest { Mode = "screen" };
+        var shot = new CaptureScreenshotRequest { Mode = ScreenshotMode.Screen };
         var shotJson = IpcSerializer.SerializeRequest(shot);
         var shotBack = IpcSerializer.DeserializeRequestData<CaptureScreenshotRequest>(
             IpcSerializer.DeserializeRequest(shotJson)!.Value.data);
-        shotBack!.Mode.Should().Be("screen");
+        shotBack!.Mode.Should().Be(ScreenshotMode.Screen);
 
         var fullShot = new CaptureScreenshotRequest { FullContent = true };
         var fullShotJson = IpcSerializer.SerializeRequest(fullShot);
@@ -182,7 +199,7 @@ public class IpcSerializerTests
         {
             TypeName = "ProgressBar",
             Text = "Loading",
-            Condition = "hidden",
+            Condition = WaitCondition.Hidden,
             TimeoutMs = 8000,
             PollIntervalMs = 200
         };
@@ -194,7 +211,7 @@ public class IpcSerializerTests
         var back = IpcSerializer.DeserializeRequestData<WaitForElementRequest>(envelope.Value.data);
         back!.TypeName.Should().Be("ProgressBar");
         back.Text.Should().Be("Loading");
-        back.Condition.Should().Be("hidden");
+        back.Condition.Should().Be(WaitCondition.Hidden);
         back.TimeoutMs.Should().Be(8000);
         back.PollIntervalMs.Should().Be(200);
     }

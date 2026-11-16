@@ -3,6 +3,7 @@ using System.Text.Json;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using WpfVisualTreeMcp.Server.Services;
+using WpfVisualTreeMcp.Shared.Models;
 
 namespace WpfVisualTreeMcp.Server;
 
@@ -241,7 +242,7 @@ public partial class WpfTools
         string? type_name = null,
         string? element_name = null,
         string? text = null,
-        string condition = "visible",
+        WaitCondition condition = WaitCondition.Visible,
         int timeout_ms = 10000,
         int poll_interval_ms = 250,
         string? root_handle = null)
@@ -394,7 +395,7 @@ public partial class WpfTools
 
     [McpServerTool]
     [Description("Click a UI element. By default invokes the control's action via UI Automation (works for buttons, menu items, checkboxes, radio buttons, tabs, list items, expanders) without moving the mouse or focusing the window. Set physical=true to perform a real OS mouse click at the element's on-screen position (works on any visible element but moves the cursor and brings the window forward; auto-scrolls the element into view first). click_type: 'single' (default), 'double' (open items), 'right' (context menus) — double and right are always physical. After opening a context menu or dropdown, use wpf_capture_screenshot with mode='screen' to see it. STATE-CHANGING.")]
-    public async Task<object> WpfClickElement(string element_handle, bool physical = false, string? click_type = null)
+    public async Task<object> WpfClickElement(string element_handle, bool physical = false, ClickType? click_type = null)
     {
         if (string.IsNullOrEmpty(element_handle))
         {
@@ -478,18 +479,14 @@ public partial class WpfTools
         string? element_handle = null,
         int max_width = 1920,
         int max_height = 1080,
-        string mode = "render",
+        ScreenshotMode mode = ScreenshotMode.Render,
         bool full_content = false)
     {
         if (max_width < 1) max_width = 1;
         if (max_width > (full_content ? 16384 : 3840)) max_width = full_content ? 16384 : 3840;
         if (max_height < 1) max_height = 1;
         if (max_height > (full_content ? 16384 : 2160)) max_height = full_content ? 16384 : 2160;
-        if (mode != "render" && mode != "screen")
-        {
-            throw new ArgumentException("mode must be 'render' or 'screen'");
-        }
-        if (full_content && mode == "screen")
+        if (full_content && mode == ScreenshotMode.Screen)
         {
             throw new ArgumentException("full_content is supported with mode='render' only");
         }

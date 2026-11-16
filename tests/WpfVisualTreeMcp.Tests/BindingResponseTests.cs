@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using WpfVisualTreeMcp.Server.Services;
@@ -10,6 +11,42 @@ namespace WpfVisualTreeMcp.Tests;
 
 public class BindingResponseTests
 {
+    [Fact]
+    public void UnknownBindingAndLayoutValuesAreNotSilentlyIgnored()
+    {
+        var bridge = new NamedPipeBridge(NullLogger<NamedPipeBridge>.Instance, Mock.Of<IProcessManager>());
+        var parseBindings = typeof(NamedPipeBridge).GetMethod("ParseBindingsResponse", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var binding = Assert.Throws<TargetInvocationException>(() => parseBindings.Invoke(bridge, new object[]
+            { new GetBindingsResponse { BindingsJson = "{\"bindings\":[{\"mode\":\"Unexpected\"}]}" }, "element" }));
+        Assert.IsType<JsonException>(binding.InnerException);
+
+        var parseLayout = typeof(NamedPipeBridge).GetMethod("ParseLayoutInfoResponse", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var layout = Assert.Throws<TargetInvocationException>(() => parseLayout.Invoke(bridge, new object[]
+            { new GetLayoutInfoResponse { LayoutJson = "{\"layout\":{\"visibility\":\"Unexpected\"}}" }, "element" }));
+        Assert.IsType<JsonException>(layout.InnerException);
+    }
+
+    [Fact]
+    public void BindingAndLayoutValuesAreDecodedAsEnumsAndMissingFieldsStayNull()
+    {
+        var bridge = new NamedPipeBridge(NullLogger<NamedPipeBridge>.Instance, Mock.Of<IProcessManager>());
+        var parseBindings = typeof(NamedPipeBridge).GetMethod("ParseBindingsResponse", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var bindingResponse = new GetBindingsResponse { BindingsJson = "{\"bindings\":[{\"mode\":\"TwoWay\",\"updateTrigger\":\"PropertyChanged\",\"status\":\"AsyncPending\"},{}]}" };
+        var bindings = (BindingsResult)parseBindings.Invoke(bridge, new object[] { bindingResponse, "element" })!;
+        Assert.Equal(BindingMode.TwoWay, bindings.Bindings[0].Mode);
+        Assert.Equal(UpdateSourceTrigger.PropertyChanged, bindings.Bindings[0].UpdateTrigger);
+        Assert.Equal(BindingStatus.AsyncPending, bindings.Bindings[0].Status);
+        Assert.Null(bindings.Bindings[1].Mode);
+        Assert.Null(bindings.Bindings[1].Status);
+
+        var parseLayout = typeof(NamedPipeBridge).GetMethod("ParseLayoutInfoResponse", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var layoutResponse = new GetLayoutInfoResponse { LayoutJson = "{\"layout\":{\"horizontalAlignment\":\"Left\",\"verticalAlignment\":\"Bottom\",\"visibility\":\"Collapsed\"}}" };
+        var layout = (LayoutInfoResult)parseLayout.Invoke(bridge, new object[] { layoutResponse, "element" })!;
+        Assert.Equal(HorizontalAlignment.Left, layout.Layout.HorizontalAlignment);
+        Assert.Equal(VerticalAlignment.Bottom, layout.Layout.VerticalAlignment);
+        Assert.Equal(Visibility.Collapsed, layout.Layout.Visibility);
+    }
+
     [Theory]
     [InlineData("true", "True")]
     [InlineData("false", "False")]

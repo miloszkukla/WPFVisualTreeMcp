@@ -55,15 +55,14 @@ internal sealed class ControlInteractor
     /// <paramref name="clickType"/> selects single (default), "double" or "right" —
     /// double and right clicks are OS-level notions, so they always use the physical path.
     /// </summary>
-    public InteractionOutcome Click(UIElement element, bool physical, string? clickType = null)
+    public InteractionOutcome Click(UIElement element, bool physical, ClickType? clickType = null)
     {
         EnsureInteractable(element, "clicked");
 
-        var type = string.IsNullOrEmpty(clickType) ? "single" : clickType!.ToLowerInvariant();
-        if (type != "single" && type != "double" && type != "right")
-            throw new ArgumentException($"Unknown click_type '{clickType}'. Expected: single, double, or right.");
+        var type = clickType ?? ClickType.Single;
+        if (!Enum.IsDefined(typeof(ClickType), type)) throw new ArgumentOutOfRangeException(nameof(clickType));
 
-        if (type != "single")
+        if (type != ClickType.Single)
             return PhysicalClick(element, type);
 
         return physical ? PhysicalClick(element, type) : AutomationClick(element);
@@ -132,7 +131,7 @@ internal sealed class ControlInteractor
             "element exposes no UI Automation pattern; raised routed mouse events (best-effort)");
     }
 
-    private static InteractionOutcome PhysicalClick(UIElement element, string clickType = "single")
+    private static InteractionOutcome PhysicalClick(UIElement element, ClickType clickType = ClickType.Single)
     {
         var size = element.RenderSize;
         if (size.Width <= 0 || size.Height <= 0)
@@ -150,11 +149,11 @@ internal sealed class ControlInteractor
 
         switch (clickType)
         {
-            case "double":
+            case ClickType.Double:
                 NativeMethods.MouseLeftClick();
                 NativeMethods.MouseLeftClick();
                 return new InteractionOutcome("Physical.DoubleClick", $"OS mouse double-click at screen ({x},{y})");
-            case "right":
+            case ClickType.Right:
                 NativeMethods.MouseRightClick();
                 return new InteractionOutcome("Physical.RightClick", $"OS mouse right-click at screen ({x},{y})");
             default:

@@ -83,9 +83,9 @@ public class SharedModelsTests
             Property = "Text",
             Path = "UserName",
             Source = "ViewModel",
-            Mode = "TwoWay",
-            UpdateTrigger = "PropertyChanged",
-            Status = "Active",
+            Mode = BindingMode.TwoWay,
+            UpdateTrigger = UpdateSourceTrigger.PropertyChanged,
+            Status = BindingStatus.Active,
             CurrentValue = "John Doe"
         };
 
@@ -93,8 +93,8 @@ public class SharedModelsTests
         binding.Property.Should().Be("Text");
         binding.Path.Should().Be("UserName");
         binding.Source.Should().Be("ViewModel");
-        binding.Mode.Should().Be("TwoWay");
-        binding.Status.Should().Be("Active");
+        binding.Mode.Should().Be(BindingMode.TwoWay);
+        binding.Status.Should().Be(BindingStatus.Active);
     }
 
     [Fact]
@@ -109,9 +109,9 @@ public class SharedModelsTests
             RenderSize = new SizeInfo { Width = 800, Height = 600 },
             Margin = new ThicknessInfo { Left = 10, Top = 10, Right = 10, Bottom = 10 },
             Padding = new ThicknessInfo { Left = 5, Top = 5, Right = 5, Bottom = 5 },
-            HorizontalAlignment = "Stretch",
-            VerticalAlignment = "Stretch",
-            Visibility = "Visible"
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch,
+            Visibility = Visibility.Visible
         };
 
         // Assert
@@ -119,8 +119,8 @@ public class SharedModelsTests
         layout.ActualHeight.Should().Be(600);
         layout.Margin.Left.Should().Be(10);
         layout.Padding!.Top.Should().Be(5);
-        layout.HorizontalAlignment.Should().Be("Stretch");
-        layout.Visibility.Should().Be("Visible");
+        layout.HorizontalAlignment.Should().Be(HorizontalAlignment.Stretch);
+        layout.Visibility.Should().Be(Visibility.Visible);
     }
 
     [Fact]

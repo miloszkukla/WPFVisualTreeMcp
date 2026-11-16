@@ -426,12 +426,12 @@ public class WpfToolsTests
             WaitedMs = 480
         };
         _ipcBridgeMock
-            .Setup(x => x.WaitForElementAsync(null, "Button", null, "Save", "enabled", 5000, 100))
+            .Setup(x => x.WaitForElementAsync(null, "Button", null, "Save", WaitCondition.Enabled, 5000, 100))
             .ReturnsAsync(expected);
 
         // Act
         var result = await _tools.WpfWaitForElement(
-            type_name: "Button", text: "Save", condition: "enabled", timeout_ms: 5000, poll_interval_ms: 100);
+            type_name: "Button", text: "Save", condition: WaitCondition.Enabled, timeout_ms: 5000, poll_interval_ms: 100);
 
         // Assert
         result.Should().BeEquivalentTo(new
@@ -441,7 +441,7 @@ public class WpfToolsTests
             matched_handle = "elem_00000005",
             element_type = "System.Windows.Controls.Button"
         });
-        _ipcBridgeMock.Verify(x => x.WaitForElementAsync(null, "Button", null, "Save", "enabled", 5000, 100), Times.Once);
+        _ipcBridgeMock.Verify(x => x.WaitForElementAsync(null, "Button", null, "Save", WaitCondition.Enabled, 5000, 100), Times.Once);
     }
 
     [Fact]
@@ -459,7 +459,7 @@ public class WpfToolsTests
             Element = new ElementInfo { Handle = "txt_1", TypeName = "TextBox" },
             Bindings = new List<BindingInfo>
             {
-                new BindingInfo { Property = "Text", Path = "UserName", Mode = "TwoWay" }
+                new BindingInfo { Property = "Text", Path = "UserName", Mode = BindingMode.TwoWay }
             }
         };
 
@@ -673,7 +673,7 @@ public class WpfToolsTests
             ElementType = "ScrollViewer"
         };
         _ipcBridgeMock
-            .Setup(x => x.CaptureScreenshotAsync("elem_1", 800, 4000, "render", true))
+            .Setup(x => x.CaptureScreenshotAsync("elem_1", 800, 4000, ScreenshotMode.Render, true))
             .ReturnsAsync(expectedResult);
 
         // Act
@@ -686,7 +686,7 @@ public class WpfToolsTests
         // Assert
         result.Content.Should().HaveCount(2);
         _ipcBridgeMock.Verify(
-            x => x.CaptureScreenshotAsync("elem_1", 800, 4000, "render", true),
+            x => x.CaptureScreenshotAsync("elem_1", 800, 4000, ScreenshotMode.Render, true),
             Times.Once);
     }
 
@@ -695,7 +695,7 @@ public class WpfToolsTests
     {
         // Arrange
         _ipcBridgeMock
-            .Setup(x => x.CaptureScreenshotAsync("elem_1", 1920, 1080, "screen", false))
+            .Setup(x => x.CaptureScreenshotAsync("elem_1", 1920, 1080, ScreenshotMode.Screen, false))
             .ReturnsAsync(new ScreenshotResult
             {
                 ImageBase64 = "iVBORw0KGgo=",
@@ -707,12 +707,12 @@ public class WpfToolsTests
         // Act
         var result = await _tools.WpfCaptureScreenshot(
             element_handle: "elem_1",
-            mode: "screen");
+            mode: ScreenshotMode.Screen);
 
         // Assert
         result.Content.Should().HaveCount(2);
         _ipcBridgeMock.Verify(
-            x => x.CaptureScreenshotAsync("elem_1", 1920, 1080, "screen", false),
+            x => x.CaptureScreenshotAsync("elem_1", 1920, 1080, ScreenshotMode.Screen, false),
             Times.Once);
     }
 
@@ -721,13 +721,13 @@ public class WpfToolsTests
     {
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            _tools.WpfCaptureScreenshot(mode: "screen", full_content: true));
+            _tools.WpfCaptureScreenshot(mode: ScreenshotMode.Screen, full_content: true));
         _ipcBridgeMock.Verify(
             x => x.CaptureScreenshotAsync(
                 It.IsAny<string?>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
-                It.IsAny<string>(),
+                It.IsAny<ScreenshotMode>(),
                 It.IsAny<bool>()),
             Times.Never);
     }

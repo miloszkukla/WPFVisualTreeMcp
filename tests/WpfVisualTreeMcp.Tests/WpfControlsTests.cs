@@ -59,12 +59,12 @@ public class WpfControlsTests
         var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
         transport.Setup(x => x.FindAsync(null, "FrameworkElement", "panel", null, null, true, 10000)).ReturnsAsync("panel-handle");
         transport.Setup(x => x.FindAsync("Save", "Button", null, null, "panel-handle", true, 2500)).ReturnsAsync("button-handle");
-        transport.Setup(x => x.ClickAsync("button-handle", true, "double")).Returns(Task.CompletedTask);
+        transport.Setup(x => x.ClickAsync("button-handle", true, ClickType.Double)).Returns(Task.CompletedTask);
         var controls = new WpfControls(transport.Object);
 
         var panel = await controls.FindAsync<FrameworkElement>(name: "panel");
         var button = await panel.FindAsync<Button>(automationId: "Save", timeoutMs: 2500);
-        await button.PhysicalClickAsync("double");
+        await button.PhysicalClickAsync(ClickType.Double);
 
         transport.VerifyAll();
     }

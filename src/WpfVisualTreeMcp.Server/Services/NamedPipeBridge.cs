@@ -409,7 +409,7 @@ public partial class NamedPipeBridge : IIpcBridge
     }
 
     public async Task<WaitForResult> WaitForElementAsync(string? rootHandle, string? typeName, string? elementName,
-        string? text, string condition, int timeoutMs, int pollIntervalMs)
+        string? text, WaitCondition condition, int timeoutMs, int pollIntervalMs)
     {
         var session = EnsureConnected();
 
@@ -467,7 +467,7 @@ public partial class NamedPipeBridge : IIpcBridge
         };
     }
 
-    public async Task<ScreenshotResult> CaptureScreenshotAsync(string? elementHandle, int maxWidth, int maxHeight, string mode = "render", bool fullContent = false)
+    public async Task<ScreenshotResult> CaptureScreenshotAsync(string? elementHandle, int maxWidth, int maxHeight, ScreenshotMode mode = ScreenshotMode.Render, bool fullContent = false)
     {
         var session = EnsureConnected();
 
@@ -537,7 +537,7 @@ public partial class NamedPipeBridge : IIpcBridge
         }
     }
 
-    public async Task<ClickResult> ClickElementAsync(string elementHandle, bool physical, string? clickType = null)
+    public async Task<ClickResult> ClickElementAsync(string elementHandle, bool physical, ClickType? clickType = null)
     {
         var session = EnsureConnected();
 
@@ -993,14 +993,15 @@ public partial class NamedPipeBridge : IIpcBridge
                         Property = binding.TryGetProperty("property", out var prop) ? prop.GetString() ?? "" : "",
                         Path = binding.TryGetProperty("path", out var path) ? path.GetString() ?? "" : "",
                         Source = binding.TryGetProperty("source", out var src) ? src.GetString() ?? "" : "",
-                        Mode = binding.TryGetProperty("mode", out var mode) ? mode.GetString() ?? "" : "",
-                        UpdateTrigger = binding.TryGetProperty("updateTrigger", out var trigger) ? trigger.GetString() ?? "" : "",
-                        Status = binding.TryGetProperty("status", out var status) ? status.GetString() ?? "" : "",
+                        Mode = binding.TryGetProperty("mode", out var mode) ? mode.Deserialize<BindingMode?>() : null,
+                        UpdateTrigger = binding.TryGetProperty("updateTrigger", out var trigger) ? trigger.Deserialize<UpdateSourceTrigger?>() : null,
+                        Status = binding.TryGetProperty("status", out var status) ? status.Deserialize<BindingStatus?>() : null,
                         CurrentValue = binding.TryGetProperty("currentValue", out var val) && val.ValueKind != JsonValueKind.Null ? val.ToString() : null
                     });
                 }
             }
         }
+        catch (JsonException) { throw; }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to parse bindings JSON");
@@ -1158,9 +1159,9 @@ public partial class NamedPipeBridge : IIpcBridge
             {
                 result.Layout.ActualWidth = layout.TryGetProperty("actualWidth", out var aw) ? aw.GetDouble() : 0;
                 result.Layout.ActualHeight = layout.TryGetProperty("actualHeight", out var ah) ? ah.GetDouble() : 0;
-                result.Layout.HorizontalAlignment = layout.TryGetProperty("horizontalAlignment", out var ha) ? ha.GetString() ?? "" : "";
-                result.Layout.VerticalAlignment = layout.TryGetProperty("verticalAlignment", out var va) ? va.GetString() ?? "" : "";
-                result.Layout.Visibility = layout.TryGetProperty("visibility", out var vis) ? vis.GetString() ?? "" : "";
+                result.Layout.HorizontalAlignment = layout.TryGetProperty("horizontalAlignment", out var ha) ? ha.Deserialize<HorizontalAlignment?>() : null;
+                result.Layout.VerticalAlignment = layout.TryGetProperty("verticalAlignment", out var va) ? va.Deserialize<VerticalAlignment?>() : null;
+                result.Layout.Visibility = layout.TryGetProperty("visibility", out var vis) ? vis.Deserialize<Visibility?>() : null;
 
                 if (layout.TryGetProperty("desiredSize", out var ds))
                 {
@@ -1203,6 +1204,7 @@ public partial class NamedPipeBridge : IIpcBridge
                 }
             }
         }
+        catch (JsonException) { throw; }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to parse layout info JSON");

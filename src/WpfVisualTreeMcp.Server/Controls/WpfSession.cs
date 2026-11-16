@@ -148,7 +148,7 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
     {
         await ObserveAsync(new { path }, async () =>
         {
-            var shot = await Bridge.CaptureScreenshotAsync(null, 1920, 1080, mode: "screen");
+            var shot = await Bridge.CaptureScreenshotAsync(null, 1920, 1080, mode: ScreenshotMode.Screen);
             if (string.IsNullOrEmpty(shot.ImageBase64))
                 throw new InvalidOperationException("Inspector returned no screenshot.");
             await File.WriteAllBytesAsync(path, Convert.FromBase64String(shot.ImageBase64));
@@ -176,10 +176,10 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
         throw new InvalidOperationException($"Control not found: {automationId ?? name ?? text ?? type}");
     }
 
-    public async Task ClickAsync(string handle, string? clickType = null) =>
+    public async Task ClickAsync(string handle, ClickType? clickType = null) =>
         await ObserveAsync(new { handle, clickType }, () => Bridge.ClickElementAsync(handle, false, clickType));
 
-    public async Task PhysicalClickAsync(string handle, string? clickType = null) =>
+    public async Task PhysicalClickAsync(string handle, ClickType? clickType = null) =>
         await ObserveAsync(new { handle, clickType }, () => Bridge.ClickElementAsync(handle, true, clickType));
 
     public async Task<(string Handle, string? Name, string? Text, string? AutomationId)[]> FindControlsAsync(string? type = null,
@@ -281,6 +281,6 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
     Task<(string Handle, string? Name, string? Text, string? AutomationId)[]> IWpfControlTransport.FindAllAsync(string? type, string? name, string? text, string? root, bool visibleOnly) =>
         FindControlsAsync(type, name, text, root, visibleOnly);
 
-    Task IWpfControlTransport.ClickAsync(string handle, bool physical, string? clickType) =>
+    Task IWpfControlTransport.ClickAsync(string handle, bool physical, ClickType? clickType) =>
         physical ? PhysicalClickAsync(handle, clickType) : ClickAsync(handle, clickType);
 }
