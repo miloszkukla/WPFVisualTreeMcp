@@ -1,4 +1,6 @@
 using FluentAssertions;
+using Moq;
+using System.Text.Json;
 using WpfVisualTreeMcp.Server.Controls;
 using Xunit;
 
@@ -6,6 +8,25 @@ namespace WpfVisualTreeMcp.Tests;
 
 public sealed class WpfSelectorTests
 {
+    [Fact]
+    public async Task TextReadRejectsNonStringValuesAndPreservesUnavailableAndNull()
+    {
+        var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
+        transport.Setup(x => x.FindAsync(null, "Button", null, null, null, true, 10000)).ReturnsAsync("button");
+        transport.SetupSequence(x => x.ReadAsync("button", "DataContext", "Id"))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { value = new { Id = new { value = "17" } } }))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { value = new { Id = new { value = 17 } } }))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { value = new { Id = new { value = (string?)null } } }))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { value = new { Id = new { error = "unreadable" } } }));
+        var button = await new WpfControls(transport.Object).FindAsync<Button>();
+
+        (await WpfSelector.TextAsync(button, "DataContext", "Id")).Should().Be(new SelectorValue<string>(true, "17"));
+        (await WpfSelector.TextAsync(button, "DataContext", "Id")).IsAvailable.Should().BeFalse();
+        (await WpfSelector.TextAsync(button, "DataContext", "Id")).Should().Be(new SelectorValue<string>(true, ""));
+        (await WpfSelector.TextAsync(button, "DataContext", "Id")).IsAvailable.Should().BeFalse();
+        transport.VerifyAll();
+    }
+
     [Fact]
     public async Task SkipsUnavailableValuesAndMatchesTypedIndex()
     {

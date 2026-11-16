@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Globalization;
 using System.Text.Json;
 
 namespace WpfVisualTreeMcp.Server.Controls;
@@ -11,8 +10,15 @@ public static class WpfSelector
 {
     public static async Task<SelectorValue<string>> TextAsync(WpfElement element, string path, string field)
     {
-        var value = await element.ReadTextAsync(path, field);
-        return new(value.IsAvailable, value.Text);
+        var projection = await element.ReadAsync(path, field);
+        if (!projection.TryGetProperty("value", out var values) || !values.TryGetProperty(field, out var member)
+            || !member.TryGetProperty("value", out var value)) return new(false, "");
+        return value.ValueKind switch
+        {
+            JsonValueKind.String => new(true, value.GetString()!),
+            JsonValueKind.Null => new(true, ""),
+            _ => new(false, "")
+        };
     }
 
     public static Task<SelectorValue<string>> ContentAsync(ContentControl element) => TextAsync(element, "", "Content");
@@ -24,10 +30,7 @@ public static class WpfSelector
         if (!projection.TryGetProperty("value", out var values) || !values.TryGetProperty(field, out var member)
             || !member.TryGetProperty("value", out var value)) return new(false, default);
         var index = 0;
-        var text = value.ToString();
-        var available = value.ValueKind is JsonValueKind.String or JsonValueKind.Number
-            && int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out index)
-            && index.ToString(CultureInfo.InvariantCulture) == text;
+        var available = value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out index);
         return new(available, available ? index : default);
     }
 
