@@ -439,6 +439,26 @@ public class WpfControlsTests
     }
 
     [Fact]
+    public async Task BorderExposesItsSolidBackgroundAndScreenBounds()
+    {
+        var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
+        transport.Setup(x => x.FindAsync(null, "Border", null, null, null, true, 10000)).ReturnsAsync("border");
+        transport.Setup(x => x.GetScreenBoundsAsync("border")).ReturnsAsync(new ScreenBounds { X = 10, Y = 20, Width = 30, Height = 40 });
+        transport.Setup(x => x.ReadAsync("border", "", "Parent.Parent.Name"))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { value = new Dictionary<string, object> { ["Parent.Parent.Name"] = new { value = "Content" } } }));
+        transport.Setup(x => x.ReadAsync("border", "", "Background"))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { value = new { Background = new { value = new { type = "System.Windows.Media.SolidColorBrush" } } } }));
+        transport.Setup(x => x.ReadAsync("border", "", "Background.Color.A,Background.Color.R,Background.Color.G,Background.Color.B,Background.Opacity"))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { value = new Dictionary<string, object> { ["Background.Color.A"] = new { value = 255 }, ["Background.Color.R"] = new { value = 128 }, ["Background.Color.G"] = new { value = 128 }, ["Background.Color.B"] = new { value = 128 }, ["Background.Opacity"] = new { value = 0.5 } } }));
+        var border = await new WpfControls(transport.Object).FindAsync<Border>();
+
+        (await border.SolidBackgroundAsync()).Should().Be(new SolidColorBrushState(255, 128, 128, 128, 0.5));
+        (await border.ScreenBoundsAsync())!.Width.Should().Be(30);
+        (await border.AncestorNameAsync(2)).Should().Be("Content");
+        transport.VerifyAll();
+    }
+
+    [Fact]
     public async Task LookupPropagatesTransportFailuresAndCancellation()
     {
         var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);

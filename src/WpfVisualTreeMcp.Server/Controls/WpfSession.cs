@@ -210,6 +210,12 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
         await Task.Delay(100, CancellationToken);
     }
 
+    public async Task<ScreenBounds?> GetScreenBoundsAsync(string handle)
+    {
+        var found = await ObserveAsync(new { handle }, () => Bridge.FindElementsAsync(handle, null, null, null, null, true, 1));
+        return found.Elements.SingleOrDefault(item => item.Handle == handle)?.ScreenBounds;
+    }
+
     public async Task ScrollAsync(string handle, int delta)
     {
         await HoverAsync(handle);

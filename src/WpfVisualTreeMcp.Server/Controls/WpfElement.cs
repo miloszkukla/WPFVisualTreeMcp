@@ -9,6 +9,7 @@ public readonly record struct ElementState(bool IsVisible, bool IsEnabled);
 public readonly record struct RenderedTextState(string? Text, bool IsVisible);
 public readonly record struct ScrollState(double Offset, double Height, double Viewport, bool MeasureValid, bool ArrangeValid);
 public readonly record struct ItemsLayoutState(int Count, bool MeasureValid, bool ArrangeValid);
+public readonly record struct SolidColorBrushState(byte A, byte R, byte G, byte B, double Opacity);
 
 /// <summary>Identifies the target WPF CLR type represented by a proxy.</summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
@@ -36,6 +37,7 @@ public interface IWpfControlTransport
     Task SendKeysAsync(string handle, string keys);
     Task HoverAsync(string handle);
     Task ScrollAsync(string handle, int delta);
+    Task<ScreenBounds?> GetScreenBoundsAsync(string handle);
     Task WaitForStableBoundsAsync(string handle);
     Task SetPropertyAsync(string handle, string property, string value);
     Task ScrollViewerAsync(string handle, ScrollViewerAction action);
@@ -129,6 +131,7 @@ public class WpfElement : IEquatable<WpfElement>
     public Task SendKeysAsync(string keys) => Owner.Transport.SendKeysAsync(Handle, keys);
     public Task HoverAsync() => Owner.Transport.HoverAsync(Handle);
     public Task ScrollAsync(int delta) => Owner.Transport.ScrollAsync(Handle, delta);
+    public Task<ScreenBounds?> ScreenBoundsAsync() => Owner.Transport.GetScreenBoundsAsync(Handle);
     public Task WaitForStableBoundsAsync() => Owner.Transport.WaitForStableBoundsAsync(Handle);
     public Task<string> RenderedTextAsync() => Owner.Transport.RenderedTextAsync(Handle);
     public async Task<TextLayout> TextLayoutAsync() => new(WpfSession.Value((await ReadAsync("", "$textLayout")).GetProperty("value"), "$textLayout"));
@@ -138,6 +141,11 @@ public class WpfElement : IEquatable<WpfElement>
         if (generations < 1) throw new ArgumentOutOfRangeException(nameof(generations));
         var path = string.Join(".", Enumerable.Repeat("Parent", generations));
         return WpfSession.Value((await ReadAsync(path, "IsEnabled")).GetProperty("value"), "IsEnabled").GetBoolean();
+    }
+    public Task<string?> AncestorNameAsync(int generations)
+    {
+        if (generations < 1) throw new ArgumentOutOfRangeException(nameof(generations));
+        return PropertyAsync<string>(string.Join(".", Enumerable.Repeat("Parent", generations)) + ".Name");
     }
     public async Task<bool> OwnedToolTipIsOpenAsync() => WpfSession.Value((await ReadAsync("ToolTip", "IsOpen")).GetProperty("value"), "IsOpen").GetBoolean();
     public async Task<bool> HasNoEffectAsync() => WpfSession.Value((await ReadAsync("", "Effect")).GetProperty("value"), "Effect").ValueKind == JsonValueKind.Null;
@@ -213,6 +221,7 @@ public class UIElement(WpfElement element) : Visual(element);
 [WpfType("FrameworkElement")]
 public class FrameworkElement(WpfElement element) : UIElement(element)
 {
+    public Task<string?> ParentTypeNameAsync() => ReadValueAsync("", "Parent", value => value.ValueKind == JsonValueKind.Null ? null : value.GetProperty("type").GetString());
     public Task<bool> IsVisibleAsync() => PropertyAsync<bool>("IsVisible");
     public Task<bool> IsEnabledAsync() => PropertyAsync<bool>("IsEnabled");
     public Task<string?> ToolTipTextAsync() => PropertyAsync<string>("ToolTip");
@@ -483,7 +492,17 @@ public class StackPanel(WpfElement element) : Panel(element);
 public class Decorator(WpfElement element) : FrameworkElement(element);
 
 [WpfType("Border")]
-public class Border(WpfElement element) : Decorator(element);
+public class Border(WpfElement element) : Decorator(element)
+{
+    public async Task<SolidColorBrushState?> SolidBackgroundAsync()
+    {
+        var type = await ReadValueAsync("", "Background", value => value.ValueKind == JsonValueKind.Null ? null : value.GetProperty("type").GetString());
+        if (type != "System.Windows.Media.SolidColorBrush") return null;
+        var values = (await ReadAsync("", "Background.Color.A,Background.Color.R,Background.Color.G,Background.Color.B,Background.Opacity")).GetProperty("value");
+        return new SolidColorBrushState(WpfSession.Value(values, "Background.Color.A").GetByte(), WpfSession.Value(values, "Background.Color.R").GetByte(),
+            WpfSession.Value(values, "Background.Color.G").GetByte(), WpfSession.Value(values, "Background.Color.B").GetByte(), WpfSession.Value(values, "Background.Opacity").GetDouble());
+    }
+}
 
 [WpfType("Image")]
 public class Image(WpfElement element) : FrameworkElement(element)
