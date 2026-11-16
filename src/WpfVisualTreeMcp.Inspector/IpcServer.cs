@@ -15,14 +15,14 @@ namespace WpfVisualTreeMcp.Inspector;
 public class IpcServer : IDisposable
 {
     private readonly string _pipeName;
-    private readonly Func<string, JsonElement, Task<IpcResponse>> _requestHandler;
+    private readonly Func<IpcRequestType, JsonElement, Task<IpcResponse>> _requestHandler;
     private CancellationTokenSource? _cts;
     private Task? _serverTask;
     private bool _disposed;
 
     public event Action<string>? NotificationReady;
 
-    public IpcServer(int processId, Func<string, JsonElement, Task<IpcResponse>> requestHandler)
+    public IpcServer(int processId, Func<IpcRequestType, JsonElement, Task<IpcResponse>> requestHandler)
     {
         _pipeName = $"wpf_inspector_{processId}";
         _requestHandler = requestHandler;

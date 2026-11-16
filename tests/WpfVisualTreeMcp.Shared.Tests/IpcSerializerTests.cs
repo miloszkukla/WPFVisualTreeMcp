@@ -15,6 +15,43 @@ namespace WpfVisualTreeMcp.Tests;
 public class IpcSerializerTests
 {
     [Fact]
+    public void RequestTypeRoundTripsAndRejectsUnknownOrNumericDiscriminators()
+    {
+        var request = new ClrReadRequest { ElementHandle = "element" };
+        var json = IpcSerializer.SerializeRequest(request);
+        var envelope = IpcSerializer.DeserializeRequest(json);
+        envelope!.Value.type.Should().Be(IpcRequestType.ReadClr);
+        IpcSerializer.DeserializeRequestData<ClrReadRequest>(envelope.Value.data)!.ElementHandle.Should().Be("element");
+        IpcSerializer.DeserializeRequest("{\"type\":\"readclr\",\"data\":{}}")!.Value.type.Should().Be(IpcRequestType.ReadClr);
+        IpcSerializer.DeserializeRequest("{\"type\":\"other\",\"data\":{}}").Should().BeNull();
+        IpcSerializer.DeserializeRequest("{\"type\":1,\"data\":{}}").Should().BeNull();
+    }
+
+    [Fact]
+    public void ResourceAndExportOptionsRoundTripAndRejectUnknownValues()
+    {
+        var resource = IpcSerializer.DeserializeRequestData<GetResourcesRequest>(JsonDocument.Parse("{\"scope\":\"all\"}").RootElement);
+        var export = IpcSerializer.DeserializeRequestData<ExportTreeRequest>(JsonDocument.Parse("{\"format\":\"xaml\"}").RootElement);
+        resource!.Scope.Should().Be(ResourceScope.All);
+        export!.Format.Should().Be(TreeExportFormat.Xaml);
+        Action invalidScope = () => IpcSerializer.DeserializeRequestData<GetResourcesRequest>(JsonDocument.Parse("{\"scope\":\"unknown\"}").RootElement);
+        Action invalidFormat = () => IpcSerializer.DeserializeRequestData<ExportTreeRequest>(JsonDocument.Parse("{\"format\":1}").RootElement);
+        invalidScope.Should().Throw<JsonException>();
+        invalidFormat.Should().Throw<JsonException>();
+    }
+
+    [Theory]
+    [InlineData(PreviousPropertySource.Binding)]
+    [InlineData(PreviousPropertySource.Local)]
+    [InlineData(PreviousPropertySource.Unset)]
+    public void PreviousPropertySourceRoundTripsThroughIpc(PreviousPropertySource source)
+    {
+        var response = new SetPropertyResponse { PreviousSource = source };
+        var json = IpcSerializer.SerializeResponse(response);
+        IpcSerializer.DeserializeResponse<SetPropertyResponse>(json)!.PreviousSource.Should().Be(source);
+    }
+
+    [Fact]
     public void InspectionEnumsReadExistingStringValuesAndRejectInvalidValues()
     {
         var click = IpcSerializer.DeserializeRequestData<ClickElementRequest>(JsonDocument.Parse("{\"clickType\":\"right\"}").RootElement);
@@ -82,7 +119,7 @@ public class IpcSerializerTests
         var envelope = IpcSerializer.DeserializeRequest(json);
 
         envelope.Should().NotBeNull();
-        envelope!.Value.type.Should().Be("FindElements");
+        envelope!.Value.type.Should().Be(IpcRequestType.FindElements);
 
         var roundTripped = IpcSerializer.DeserializeRequestData<FindElementsRequest>(envelope.Value.data);
         roundTripped.Should().NotBeNull();
@@ -106,7 +143,7 @@ public class IpcSerializerTests
         var json = IpcSerializer.SerializeRequest(request);
         var envelope = IpcSerializer.DeserializeRequest(json);
 
-        envelope!.Value.type.Should().Be("SelectItem");
+        envelope!.Value.type.Should().Be(IpcRequestType.SelectItem);
         var roundTripped = IpcSerializer.DeserializeRequestData<SelectItemRequest>(envelope.Value.data);
         roundTripped!.ElementHandle.Should().Be("elem_00000007");
         roundTripped.ItemText.Should().Be("Italia");
@@ -140,7 +177,7 @@ public class IpcSerializerTests
     {
         var req = new ExplainTriggersRequest { ElementHandle = "elem_7", PropertyName = "Background" };
         var envelope = IpcSerializer.DeserializeRequest(IpcSerializer.SerializeRequest(req));
-        envelope!.Value.type.Should().Be("ExplainTriggers");
+        envelope!.Value.type.Should().Be(IpcRequestType.ExplainTriggers);
         var back = IpcSerializer.DeserializeRequestData<ExplainTriggersRequest>(envelope.Value.data);
         back!.ElementHandle.Should().Be("elem_7");
         back.PropertyName.Should().Be("Background");
@@ -151,7 +188,7 @@ public class IpcSerializerTests
     {
         var req = new EvaluateBindingRequest { ElementHandle = "elem_5", PropertyName = "Text" };
         var envelope = IpcSerializer.DeserializeRequest(IpcSerializer.SerializeRequest(req));
-        envelope!.Value.type.Should().Be("EvaluateBinding");
+        envelope!.Value.type.Should().Be(IpcRequestType.EvaluateBinding);
         var back = IpcSerializer.DeserializeRequestData<EvaluateBindingRequest>(envelope.Value.data);
         back!.ElementHandle.Should().Be("elem_5");
         back.PropertyName.Should().Be("Text");
@@ -169,7 +206,7 @@ public class IpcSerializerTests
 
         var diff = new DiffRequest { Before = "before", After = "after" };
         var diffEnvelope = IpcSerializer.DeserializeRequest(IpcSerializer.SerializeRequest(diff));
-        diffEnvelope!.Value.type.Should().Be("Diff");
+        diffEnvelope!.Value.type.Should().Be(IpcRequestType.Diff);
         var diffBack = IpcSerializer.DeserializeRequestData<DiffRequest>(diffEnvelope.Value.data);
         diffBack!.Before.Should().Be("before");
         diffBack.After.Should().Be("after");
@@ -187,7 +224,7 @@ public class IpcSerializerTests
 
         var revert = new RevertPropertyRequest { All = true };
         var revertEnvelope = IpcSerializer.DeserializeRequest(IpcSerializer.SerializeRequest(revert));
-        revertEnvelope!.Value.type.Should().Be("RevertProperty");
+        revertEnvelope!.Value.type.Should().Be(IpcRequestType.RevertProperty);
         var revertBack = IpcSerializer.DeserializeRequestData<RevertPropertyRequest>(revertEnvelope.Value.data);
         revertBack!.All.Should().BeTrue();
     }
@@ -207,7 +244,7 @@ public class IpcSerializerTests
         var json = IpcSerializer.SerializeRequest(request);
         var envelope = IpcSerializer.DeserializeRequest(json);
 
-        envelope!.Value.type.Should().Be("WaitForElement");
+        envelope!.Value.type.Should().Be(IpcRequestType.WaitForElement);
         var back = IpcSerializer.DeserializeRequestData<WaitForElementRequest>(envelope.Value.data);
         back!.TypeName.Should().Be("ProgressBar");
         back.Text.Should().Be("Loading");

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Windows;
 using System.Windows.Data;
+using PropertyValueSource = WpfVisualTreeMcp.Shared.Models.PropertyValueSource;
 
 namespace WpfVisualTreeMcp.Inspector;
 
@@ -218,22 +219,22 @@ public class PropertyReader
         return $"\"{EscapeJson(str)}\"";
     }
 
-    private string GetSourceName(BaseValueSource source)
+    private PropertyValueSource GetSourceName(BaseValueSource source)
     {
         return source switch
         {
-            BaseValueSource.Default => "Default",
-            BaseValueSource.Inherited => "Inherited",
-            BaseValueSource.DefaultStyle => "DefaultStyle",
-            BaseValueSource.DefaultStyleTrigger => "DefaultStyleTrigger",
-            BaseValueSource.Style => "Style",
-            BaseValueSource.TemplateTrigger => "TemplateTrigger",
-            BaseValueSource.StyleTrigger => "StyleTrigger",
-            BaseValueSource.ImplicitStyleReference => "ImplicitStyle",
-            BaseValueSource.ParentTemplate => "ParentTemplate",
-            BaseValueSource.ParentTemplateTrigger => "ParentTemplateTrigger",
-            BaseValueSource.Local => "Local",
-            _ => "Unknown"
+            BaseValueSource.Default => PropertyValueSource.Default,
+            BaseValueSource.Inherited => PropertyValueSource.Inherited,
+            BaseValueSource.DefaultStyle => PropertyValueSource.DefaultStyle,
+            BaseValueSource.DefaultStyleTrigger => PropertyValueSource.DefaultStyleTrigger,
+            BaseValueSource.Style => PropertyValueSource.Style,
+            BaseValueSource.TemplateTrigger => PropertyValueSource.TemplateTrigger,
+            BaseValueSource.StyleTrigger => PropertyValueSource.StyleTrigger,
+            BaseValueSource.ImplicitStyleReference => PropertyValueSource.ImplicitStyle,
+            BaseValueSource.ParentTemplate => PropertyValueSource.ParentTemplate,
+            BaseValueSource.ParentTemplateTrigger => PropertyValueSource.ParentTemplateTrigger,
+            BaseValueSource.Local => PropertyValueSource.Local,
+            _ => PropertyValueSource.Unknown
         };
     }
 

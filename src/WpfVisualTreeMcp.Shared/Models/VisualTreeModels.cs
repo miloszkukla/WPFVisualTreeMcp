@@ -40,7 +40,7 @@ public class PropertyInfo
     public string Name { get; set; } = string.Empty;
     public string TypeName { get; set; } = string.Empty;
     public string? Value { get; set; }
-    public string Source { get; set; } = "Default";
+    public PropertyValueSource Source { get; set; } = PropertyValueSource.Default;
     public bool IsBinding { get; set; }
 }
 
@@ -128,7 +128,7 @@ public class SetPropertyResult
     public string? ValueType { get; set; }
 
     /// <summary>What held the property before: "Binding", "Local", or "Unset".</summary>
-    public string? PreviousSource { get; set; }
+    public PreviousPropertySource? PreviousSource { get; set; }
 }
 
 /// <summary>

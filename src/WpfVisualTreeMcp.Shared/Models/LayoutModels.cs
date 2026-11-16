@@ -50,7 +50,7 @@ public class LayoutInfoResult
 /// </summary>
 public class ExportResult
 {
-    public string Format { get; set; } = "json";
+    public TreeExportFormat Format { get; set; } = TreeExportFormat.Json;
     public string Content { get; set; } = string.Empty;
     public int ElementCount { get; set; }
 }

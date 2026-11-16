@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Data;
+using WpfVisualTreeMcp.Shared.Models;
 
 namespace WpfVisualTreeMcp.Inspector;
 
@@ -36,7 +37,7 @@ public class PropertyWriter
 
     public readonly struct SetOutcome
     {
-        public SetOutcome(string appliedValue, string valueType, string previousSource)
+        public SetOutcome(string appliedValue, string valueType, PreviousPropertySource previousSource)
         {
             AppliedValue = appliedValue;
             ValueType = valueType;
@@ -48,7 +49,7 @@ public class PropertyWriter
         public string ValueType { get; }
 
         /// <summary>What held the property before: "Binding", "Local", or "Unset".</summary>
-        public string PreviousSource { get; }
+        public PreviousPropertySource PreviousSource { get; }
     }
 
     /// <summary>
@@ -75,8 +76,8 @@ public class PropertyWriter
         var previousBinding = BindingOperations.GetBindingBase(element, dp);
         var previousLocal = element.ReadLocalValue(dp);
         var previousSource = previousBinding != null
-            ? "Binding"
-            : (previousLocal == DependencyProperty.UnsetValue ? "Unset" : "Local");
+            ? PreviousPropertySource.Binding
+            : (previousLocal == DependencyProperty.UnsetValue ? PreviousPropertySource.Unset : PreviousPropertySource.Local);
 
         element.SetValue(dp, converted);
 

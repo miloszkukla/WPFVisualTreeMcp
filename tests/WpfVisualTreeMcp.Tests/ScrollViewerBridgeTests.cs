@@ -174,7 +174,7 @@ public class ScrollViewerBridgeTests
         var json = await reader.ReadLineAsync(cancellationToken);
         var envelope = IpcSerializer.DeserializeRequest(json!);
         envelope.Should().NotBeNull();
-        envelope!.Value.type.Should().Be("ScrollItemIntoView");
+        envelope!.Value.type.Should().Be(IpcRequestType.ScrollItemIntoView);
         var request = IpcSerializer.DeserializeRequestData<ScrollItemIntoViewRequest>(envelope.Value.data)!;
         var bytes = Encoding.UTF8.GetBytes(IpcSerializer.SerializeResponse(response(request)) + "\n");
         await server.WriteAsync(bytes, cancellationToken);
@@ -190,7 +190,7 @@ public class ScrollViewerBridgeTests
         var json = await reader.ReadLineAsync(cancellationToken);
         var envelope = IpcSerializer.DeserializeRequest(json!);
         envelope.Should().NotBeNull();
-        envelope!.Value.type.Should().Be("ScrollViewer");
+        envelope!.Value.type.Should().Be(IpcRequestType.ScrollViewer);
         var request = IpcSerializer.DeserializeRequestData<ScrollViewerRequest>(envelope.Value.data)!;
         var bytes = Encoding.UTF8.GetBytes(IpcSerializer.SerializeResponse(response(request)) + "\n");
         await server.WriteAsync(bytes, cancellationToken);

@@ -6,6 +6,7 @@ using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using ResourceScope = WpfVisualTreeMcp.Shared.Models.ResourceScope;
 
 namespace WpfVisualTreeMcp.Inspector;
 
@@ -20,20 +21,20 @@ public class ResourceInspector
     /// <param name="scope">The scope: "application", "window", or "element".</param>
     /// <param name="element">The element for element-scoped resources.</param>
     /// <returns>JSON representation of resources.</returns>
-    public string GetResources(string scope, FrameworkElement? element)
+    public string GetResources(ResourceScope scope, FrameworkElement? element)
     {
         var sb = new StringBuilder();
         sb.Append("[");
 
         var resources = new List<string>();
 
-        switch (scope?.ToLower())
+        switch (scope)
         {
-            case "application":
+            case ResourceScope.Application:
                 CollectResources(Application.Current.Resources, "Application", resources);
                 break;
 
-            case "window":
+            case ResourceScope.Window:
                 var window = element != null ? Window.GetWindow(element) : Application.Current.MainWindow;
                 if (window != null)
                 {
@@ -41,14 +42,14 @@ public class ResourceInspector
                 }
                 break;
 
-            case "element":
+            case ResourceScope.Element:
                 if (element != null)
                 {
                     CollectElementResources(element, resources);
                 }
                 break;
 
-            default:
+            case ResourceScope.All:
                 // Collect all resources
                 CollectResources(Application.Current.Resources, "Application", resources);
                 var mainWindow = Application.Current.MainWindow;
@@ -57,6 +58,8 @@ public class ResourceInspector
                     CollectResources(mainWindow.Resources, "Window", resources);
                 }
                 break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(scope));
         }
 
         for (int i = 0; i < resources.Count; i++)

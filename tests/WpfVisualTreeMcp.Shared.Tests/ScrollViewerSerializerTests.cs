@@ -25,7 +25,7 @@ public class ScrollViewerSerializerTests
         var envelope = IpcSerializer.DeserializeRequest(IpcSerializer.SerializeRequest(request));
 
         envelope.Should().NotBeNull();
-        envelope!.Value.type.Should().Be("ScrollItemIntoView");
+        envelope!.Value.type.Should().Be(IpcRequestType.ScrollItemIntoView);
         var restored = IpcSerializer.DeserializeRequestData<ScrollItemIntoViewRequest>(envelope.Value.data);
         restored.Should().BeEquivalentTo(request);
     }
@@ -59,7 +59,7 @@ public class ScrollViewerSerializerTests
         var envelope = IpcSerializer.DeserializeRequest(IpcSerializer.SerializeRequest(request));
 
         envelope.Should().NotBeNull();
-        envelope!.Value.type.Should().Be("ScrollViewer");
+        envelope!.Value.type.Should().Be(IpcRequestType.ScrollViewer);
         var restored = IpcSerializer.DeserializeRequestData<ScrollViewerRequest>(envelope.Value.data);
         restored.Should().BeEquivalentTo(request);
     }

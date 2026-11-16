@@ -75,7 +75,7 @@ wpfinspect help
    $attachResult.inspectorStatus
    ```
 
-   Continue if the Inspector is already loaded. If it is not loaded, choose auto-injection or self-hosting using the rules below. Auto-inject once; the Inspector remains in that target process for later one-shot commands:
+   Continue if `inspectorStatus` is `LoadedExisting` or `LoadedInjected`. For other states, inspect `inspectorStatusDetail`. If it is not loaded, choose auto-injection or self-hosting using the rules below. Auto-inject once; the Inspector remains in that target process for later one-shot commands:
 
    ```powershell
    wpfinspect attach --pid $targetProcessId --auto-inject

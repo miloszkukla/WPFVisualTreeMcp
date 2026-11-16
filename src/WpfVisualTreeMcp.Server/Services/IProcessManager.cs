@@ -1,3 +1,5 @@
+using WpfVisualTreeMcp.Shared.Models;
+
 namespace WpfVisualTreeMcp.Server.Services;
 
 /// <summary>
@@ -10,7 +12,7 @@ public record WpfProcessInfo
     public string? MainWindowTitle { get; init; }
     public bool IsAttached { get; init; }
     public string? DotNetVersion { get; init; }
-    public string? RuntimeType { get; init; }  // "Framework" or "CoreCLR"
+    public DotNetRuntimeType? RuntimeType { get; init; }
 }
 
 /// <summary>
@@ -22,7 +24,8 @@ public class InspectionSession
     public int ProcessId { get; set; }
     public string MainWindowHandle { get; set; } = string.Empty;
     public DateTime AttachedAt { get; set; }
-    public string InspectorStatus { get; set; } = "Unknown";
+    public InspectorAttachmentStatus InspectorStatus { get; set; } = InspectorAttachmentStatus.Unknown;
+    public string? InspectorStatusDetail { get; set; }
 }
 
 /// <summary>

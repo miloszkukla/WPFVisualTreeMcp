@@ -9,6 +9,8 @@ using System.Windows;
 using WpfVisualTreeMcp.Shared.Ipc;
 using ScreenshotMode = WpfVisualTreeMcp.Shared.Models.ScreenshotMode;
 using WaitCondition = WpfVisualTreeMcp.Shared.Models.WaitCondition;
+using ResourceScope = WpfVisualTreeMcp.Shared.Models.ResourceScope;
+using TreeExportFormat = WpfVisualTreeMcp.Shared.Models.TreeExportFormat;
 
 namespace WpfVisualTreeMcp.Inspector;
 
@@ -274,13 +276,13 @@ public partial class InspectorService : IDisposable
         _ipcServer.Stop();
     }
 
-    private async Task<IpcResponse> HandleRequestAsync(string requestType, JsonElement data)
+    private async Task<IpcResponse> HandleRequestAsync(IpcRequestType requestType, JsonElement data)
     {
         try
         {
             DebugLog($"HandleRequestAsync: requestType={requestType}");
 
-            if (requestType == "InspectionIdentity") return HandleInspectionIdentity();
+            if (requestType == IpcRequestType.InspectionIdentity) return HandleInspectionIdentity();
 
             if (Application.Current == null)
             {
@@ -288,21 +290,21 @@ public partial class InspectorService : IDisposable
                 return new GetVisualTreeResponse { Success = false, Error = "Application.Current is null" };
             }
 
-            if (requestType == "ScrollViewer") return await HandleScrollViewerAsync(data);
-            if (requestType == "ScrollItemIntoView") return await HandleScrollItemIntoViewAsync(data);
+            if (requestType == IpcRequestType.ScrollViewer) return await HandleScrollViewerAsync(data);
+            if (requestType == IpcRequestType.ScrollItemIntoView) return await HandleScrollItemIntoViewAsync(data);
 
             // WaitForElement polls over time: it must NOT run inside a single blocking
             // Dispatcher.Invoke (that would freeze the UI so the condition can never
             // change, and blow the 10s Invoke timeout). Handle it with a background
             // loop that does a short Invoke per check and yields the UI thread between.
-            if (requestType == "WaitForElement")
+            if (requestType == IpcRequestType.WaitForElement)
             {
                 return await HandleWaitForElementAsync(data);
             }
 
             // Start before Dispatcher scheduling so queue delay and capture work share
             // one budget below the named-pipe request timeout (30s).
-            using var fullContentCaptureCts = requestType == "CaptureScreenshot"
+            using var fullContentCaptureCts = requestType == IpcRequestType.CaptureScreenshot
                 ? new CancellationTokenSource(FullContentCaptureTimeout)
                 : null;
             var fullContentCaptureToken = fullContentCaptureCts?.Token ?? CancellationToken.None;
@@ -357,36 +359,36 @@ public partial class InspectorService : IDisposable
     }
 
     private IpcResponse HandleRequest(
-        string requestType, JsonElement data, CancellationToken fullContentCaptureToken)
+        IpcRequestType requestType, JsonElement data, CancellationToken fullContentCaptureToken)
     {
         return requestType switch
         {
-            "GetVisualTree" => HandleGetVisualTree(data),
-            "GetElementProperties" => HandleGetElementProperties(data),
-            "ReadClr" => HandleReadClr(data),
-            "FindElements" => HandleFindElements(data),
-            "FindElementsDeep" => HandleFindElementsDeep(data),
-            "GetBindings" => HandleGetBindings(data),
-            "GetBindingErrors" => HandleGetBindingErrors(),
-            "GetResources" => HandleGetResources(data),
-            "GetStyles" => HandleGetStyles(data),
-            "HighlightElement" => HandleHighlightElement(data),
-            "GetLayoutInfo" => HandleGetLayoutInfo(data),
-            "WatchProperty" => HandleWatchProperty(data),
-            "ExportTree" => HandleExportTree(data),
-            "CaptureScreenshot" => HandleCaptureScreenshot(data, fullContentCaptureToken),
-            "GetDataContext" => HandleGetDataContext(data),
-            "ClearBindingErrors" => HandleClearBindingErrors(),
-            "SetProperty" => HandleSetProperty(data),
-            "RevertProperty" => HandleRevertProperty(data),
-            "EvaluateBinding" => HandleEvaluateBinding(data),
-            "ExplainTriggers" => HandleExplainTriggers(data),
-            "Snapshot" => HandleSnapshot(data),
-            "Diff" => HandleDiff(data),
-            "ClickElement" => HandleClickElement(data),
-            "SelectItem" => HandleSelectItem(data),
-            "SetText" => HandleSetText(data),
-            "SendKeys" => HandleSendKeys(data),
+            IpcRequestType.GetVisualTree => HandleGetVisualTree(data),
+            IpcRequestType.GetElementProperties => HandleGetElementProperties(data),
+            IpcRequestType.ReadClr => HandleReadClr(data),
+            IpcRequestType.FindElements => HandleFindElements(data),
+            IpcRequestType.FindElementsDeep => HandleFindElementsDeep(data),
+            IpcRequestType.GetBindings => HandleGetBindings(data),
+            IpcRequestType.GetBindingErrors => HandleGetBindingErrors(),
+            IpcRequestType.GetResources => HandleGetResources(data),
+            IpcRequestType.GetStyles => HandleGetStyles(data),
+            IpcRequestType.HighlightElement => HandleHighlightElement(data),
+            IpcRequestType.GetLayoutInfo => HandleGetLayoutInfo(data),
+            IpcRequestType.WatchProperty => HandleWatchProperty(data),
+            IpcRequestType.ExportTree => HandleExportTree(data),
+            IpcRequestType.CaptureScreenshot => HandleCaptureScreenshot(data, fullContentCaptureToken),
+            IpcRequestType.GetDataContext => HandleGetDataContext(data),
+            IpcRequestType.ClearBindingErrors => HandleClearBindingErrors(),
+            IpcRequestType.SetProperty => HandleSetProperty(data),
+            IpcRequestType.RevertProperty => HandleRevertProperty(data),
+            IpcRequestType.EvaluateBinding => HandleEvaluateBinding(data),
+            IpcRequestType.ExplainTriggers => HandleExplainTriggers(data),
+            IpcRequestType.Snapshot => HandleSnapshot(data),
+            IpcRequestType.Diff => HandleDiff(data),
+            IpcRequestType.ClickElement => HandleClickElement(data),
+            IpcRequestType.SelectItem => HandleSelectItem(data),
+            IpcRequestType.SetText => HandleSetText(data),
+            IpcRequestType.SendKeys => HandleSendKeys(data),
             _ => new GetVisualTreeResponse { Success = false, Error = $"Unknown request: {requestType}" }
         };
     }
@@ -597,7 +599,7 @@ public partial class InspectorService : IDisposable
     private IpcResponse HandleGetResources(JsonElement data)
     {
         var request = IpcSerializer.DeserializeRequestData<GetResourcesRequest>(data);
-        var scope = request?.Scope ?? "all";
+        var scope = request?.Scope ?? ResourceScope.All;
 
         FrameworkElement? element = null;
         if (!string.IsNullOrEmpty(request?.ElementHandle))
@@ -1103,11 +1105,11 @@ public partial class InspectorService : IDisposable
             return new ExportTreeResponse { Success = false, Error = "No root element found" };
         }
 
-        var format = request?.Format ?? "json";
+        var format = request?.Format ?? TreeExportFormat.Json;
         string content;
         int count;
 
-        if (format == "xaml")
+        if (format == TreeExportFormat.Xaml)
         {
             content = _treeWalker.ExportToXaml(root);
             count = CountElements(content);

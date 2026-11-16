@@ -39,7 +39,7 @@ public static class IpcSerializer
         return JsonSerializer.Serialize(wrapper, Options);
     }
 
-    public static (string type, JsonElement data)? DeserializeRequest(string json)
+    public static (IpcRequestType type, JsonElement data)? DeserializeRequest(string json)
     {
         try
         {
@@ -49,7 +49,7 @@ public static class IpcSerializer
             if (root.TryGetProperty("type", out var typeElement) &&
                 root.TryGetProperty("data", out var dataElement))
             {
-                return (typeElement.GetString() ?? "", dataElement.Clone());
+                return (typeElement.Deserialize<IpcRequestType>(Options), dataElement.Clone());
             }
         }
         catch

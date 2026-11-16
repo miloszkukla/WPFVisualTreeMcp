@@ -47,7 +47,7 @@ public interface IIpcBridge
     /// <summary>
     /// Gets resources at the specified scope.
     /// </summary>
-    Task<ResourcesResult> GetResourcesAsync(string scope, string? elementHandle);
+    Task<ResourcesResult> GetResourcesAsync(ResourceScope scope, string? elementHandle);
 
     /// <summary>
     /// Gets styles for an element.
@@ -115,7 +115,7 @@ public interface IIpcBridge
     /// <summary>
     /// Exports the visual tree in the specified format.
     /// </summary>
-    Task<ExportResult> ExportTreeAsync(string? elementHandle, string format);
+    Task<ExportResult> ExportTreeAsync(string? elementHandle, TreeExportFormat format);
 
     /// <summary>
     /// Captures a screenshot of the target window or element.

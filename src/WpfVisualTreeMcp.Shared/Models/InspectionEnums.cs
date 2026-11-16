@@ -25,3 +25,15 @@ public enum BindingMode { Default, OneWay, TwoWay, OneTime, OneWayToSource }
 public enum UpdateSourceTrigger { Default, PropertyChanged, LostFocus, Explicit }
 [JsonConverter(typeof(InspectionEnumConverter))]
 public enum BindingStatus { Active, Inactive, Detached, PathError, UpdateTargetError, UpdateSourceError, AsyncPending, Unattached, Error, Unknown }
+[JsonConverter(typeof(InspectionEnumConverter))]
+public enum ResourceScope { Application, Window, Element, All }
+[JsonConverter(typeof(InspectionEnumConverter))]
+public enum TreeExportFormat { Json, Xaml }
+[JsonConverter(typeof(InspectionEnumConverter))]
+public enum PropertyValueSource { Default, Inherited, DefaultStyle, DefaultStyleTrigger, Style, TemplateTrigger, StyleTrigger, ImplicitStyle, ParentTemplate, ParentTemplateTrigger, Local, Unknown }
+[JsonConverter(typeof(InspectionEnumConverter))]
+public enum PreviousPropertySource { Binding, Local, Unset }
+[JsonConverter(typeof(InspectionEnumConverter))]
+public enum DotNetRuntimeType { Framework, CoreCLR }
+[JsonConverter(typeof(InspectionEnumConverter))]
+public enum InspectorAttachmentStatus { Unknown, LoadedExisting, LoadedInjected, PipeTimeoutExisting, PipeTimeoutInjected, InjectionFailed, NotLoaded }

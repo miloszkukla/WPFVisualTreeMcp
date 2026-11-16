@@ -8,7 +8,7 @@ namespace WpfVisualTreeMcp.Shared.Ipc;
 public abstract class IpcRequest
 {
     public string RequestId { get; set; } = Guid.NewGuid().ToString("N");
-    public abstract string RequestType { get; }
+    public abstract IpcRequestType RequestType { get; }
 }
 
 /// <summary>
@@ -24,7 +24,7 @@ public abstract class IpcResponse
 // Visual Tree
 public class GetVisualTreeRequest : IpcRequest
 {
-    public override string RequestType => "GetVisualTree";
+    public override IpcRequestType RequestType => IpcRequestType.GetVisualTree;
     public string? RootHandle { get; set; }
     public int MaxDepth { get; set; } = 25;
 }
@@ -39,7 +39,7 @@ public class GetVisualTreeResponse : IpcResponse
 // Element Properties
 public class GetElementPropertiesRequest : IpcRequest
 {
-    public override string RequestType => "GetElementProperties";
+    public override IpcRequestType RequestType => IpcRequestType.GetElementProperties;
     public string ElementHandle { get; set; } = string.Empty;
 }
 
@@ -51,7 +51,7 @@ public class GetElementPropertiesResponse : IpcResponse
 // Find Elements
 public class FindElementsRequest : IpcRequest
 {
-    public override string RequestType => "FindElements";
+    public override IpcRequestType RequestType => IpcRequestType.FindElements;
     public string? RootHandle { get; set; }
     public string? TypeName { get; set; }
     public string? ElementName { get; set; }
@@ -76,7 +76,7 @@ public class FindElementsResponse : IpcResponse
 // Find Elements Deep (unlimited search)
 public class FindElementsDeepRequest : IpcRequest
 {
-    public override string RequestType => "FindElementsDeep";
+    public override IpcRequestType RequestType => IpcRequestType.FindElementsDeep;
     public string? RootHandle { get; set; }
     public string? TypeName { get; set; }
     public string? ElementName { get; set; }
@@ -99,7 +99,7 @@ public class FindElementsDeepResponse : IpcResponse
 // Explain Triggers (evaluate Style/Template triggers + attribute a property's value)
 public class ExplainTriggersRequest : IpcRequest
 {
-    public override string RequestType => "ExplainTriggers";
+    public override IpcRequestType RequestType => IpcRequestType.ExplainTriggers;
     public string ElementHandle { get; set; } = string.Empty;
 
     /// <summary>Optional: attribute this property's current value to its source (style setter / active trigger / local / default).</summary>
@@ -114,7 +114,7 @@ public class ExplainTriggersResponse : IpcResponse
 // Evaluate Binding (explain why a property has its value)
 public class EvaluateBindingRequest : IpcRequest
 {
-    public override string RequestType => "EvaluateBinding";
+    public override IpcRequestType RequestType => IpcRequestType.EvaluateBinding;
     public string ElementHandle { get; set; } = string.Empty;
     public string PropertyName { get; set; } = string.Empty;
 }
@@ -127,7 +127,7 @@ public class EvaluateBindingResponse : IpcResponse
 // Snapshot (capture element subtree state for later diff)
 public class SnapshotRequest : IpcRequest
 {
-    public override string RequestType => "Snapshot";
+    public override IpcRequestType RequestType => IpcRequestType.Snapshot;
 
     /// <summary>Root of the subtree to snapshot. Omit for the whole main window.</summary>
     public string? ElementHandle { get; set; }
@@ -147,7 +147,7 @@ public class SnapshotResponse : IpcResponse
 // Diff (compare two snapshots)
 public class DiffRequest : IpcRequest
 {
-    public override string RequestType => "Diff";
+    public override IpcRequestType RequestType => IpcRequestType.Diff;
     public string Before { get; set; } = string.Empty;
     public string After { get; set; } = string.Empty;
 }
@@ -163,7 +163,7 @@ public class DiffResponse : IpcResponse
 // Set Property (live-edit a dependency property)
 public class SetPropertyRequest : IpcRequest
 {
-    public override string RequestType => "SetProperty";
+    public override IpcRequestType RequestType => IpcRequestType.SetProperty;
     public string ElementHandle { get; set; } = string.Empty;
     public string PropertyName { get; set; } = string.Empty;
 
@@ -180,13 +180,13 @@ public class SetPropertyResponse : IpcResponse
     public string? ValueType { get; set; }
 
     /// <summary>What held the property before: "Binding", "Local", or "Unset".</summary>
-    public string? PreviousSource { get; set; }
+    public PreviousPropertySource? PreviousSource { get; set; }
 }
 
 // Revert Property (undo one or all live edits)
 public class RevertPropertyRequest : IpcRequest
 {
-    public override string RequestType => "RevertProperty";
+    public override IpcRequestType RequestType => IpcRequestType.RevertProperty;
 
     /// <summary>When true, revert every pending live edit. Otherwise revert the most recent match.</summary>
     public bool All { get; set; }
@@ -211,7 +211,7 @@ public class RevertPropertyResponse : IpcResponse
 // Wait For Element (poll until a condition holds)
 public class WaitForElementRequest : IpcRequest
 {
-    public override string RequestType => "WaitForElement";
+    public override IpcRequestType RequestType => IpcRequestType.WaitForElement;
     public string? RootHandle { get; set; }
     public string? TypeName { get; set; }
     public string? ElementName { get; set; }
@@ -239,7 +239,7 @@ public class WaitForElementResponse : IpcResponse
 // Layout Info
 public class GetLayoutInfoRequest : IpcRequest
 {
-    public override string RequestType => "GetLayoutInfo";
+    public override IpcRequestType RequestType => IpcRequestType.GetLayoutInfo;
     public string ElementHandle { get; set; } = string.Empty;
 }
 
@@ -251,7 +251,7 @@ public class GetLayoutInfoResponse : IpcResponse
 // Bindings
 public class GetBindingsRequest : IpcRequest
 {
-    public override string RequestType => "GetBindings";
+    public override IpcRequestType RequestType => IpcRequestType.GetBindings;
     public string ElementHandle { get; set; } = string.Empty;
 }
 
@@ -262,7 +262,7 @@ public class GetBindingsResponse : IpcResponse
 
 public class GetBindingErrorsRequest : IpcRequest
 {
-    public override string RequestType => "GetBindingErrors";
+    public override IpcRequestType RequestType => IpcRequestType.GetBindingErrors;
 }
 
 public class GetBindingErrorsResponse : IpcResponse
@@ -274,7 +274,7 @@ public class GetBindingErrorsResponse : IpcResponse
 // DataContext
 public class GetDataContextRequest : IpcRequest
 {
-    public override string RequestType => "GetDataContext";
+    public override IpcRequestType RequestType => IpcRequestType.GetDataContext;
     public string ElementHandle { get; set; } = string.Empty;
 }
 
@@ -286,7 +286,7 @@ public class GetDataContextResponse : IpcResponse
 // Clear Binding Errors
 public class ClearBindingErrorsRequest : IpcRequest
 {
-    public override string RequestType => "ClearBindingErrors";
+    public override IpcRequestType RequestType => IpcRequestType.ClearBindingErrors;
 }
 
 public class ClearBindingErrorsResponse : IpcResponse
@@ -297,8 +297,8 @@ public class ClearBindingErrorsResponse : IpcResponse
 // Resources & Styles
 public class GetResourcesRequest : IpcRequest
 {
-    public override string RequestType => "GetResources";
-    public string Scope { get; set; } = "application";
+    public override IpcRequestType RequestType => IpcRequestType.GetResources;
+    public ResourceScope Scope { get; set; } = ResourceScope.Application;
     public string? ElementHandle { get; set; }
 }
 
@@ -309,7 +309,7 @@ public class GetResourcesResponse : IpcResponse
 
 public class GetStylesRequest : IpcRequest
 {
-    public override string RequestType => "GetStyles";
+    public override IpcRequestType RequestType => IpcRequestType.GetStyles;
     public string ElementHandle { get; set; } = string.Empty;
 }
 
@@ -321,7 +321,7 @@ public class GetStylesResponse : IpcResponse
 // Highlight
 public class HighlightElementRequest : IpcRequest
 {
-    public override string RequestType => "HighlightElement";
+    public override IpcRequestType RequestType => IpcRequestType.HighlightElement;
     public string ElementHandle { get; set; } = string.Empty;
     public int DurationMs { get; set; } = 2000;
 }
@@ -331,7 +331,7 @@ public class HighlightElementResponse : IpcResponse { }
 // Property Watching
 public class WatchPropertyRequest : IpcRequest
 {
-    public override string RequestType => "WatchProperty";
+    public override IpcRequestType RequestType => IpcRequestType.WatchProperty;
     public string ElementHandle { get; set; } = string.Empty;
     public string PropertyName { get; set; } = string.Empty;
 }
@@ -345,9 +345,9 @@ public class WatchPropertyResponse : IpcResponse
 // Export
 public class ExportTreeRequest : IpcRequest
 {
-    public override string RequestType => "ExportTree";
+    public override IpcRequestType RequestType => IpcRequestType.ExportTree;
     public string? ElementHandle { get; set; }
-    public string Format { get; set; } = "json";
+    public TreeExportFormat Format { get; set; } = TreeExportFormat.Json;
 }
 
 public class ExportTreeResponse : IpcResponse
@@ -359,7 +359,7 @@ public class ExportTreeResponse : IpcResponse
 // Screenshot Capture
 public class CaptureScreenshotRequest : IpcRequest
 {
-    public override string RequestType => "CaptureScreenshot";
+    public override IpcRequestType RequestType => IpcRequestType.CaptureScreenshot;
     public string? ElementHandle { get; set; }
     public int MaxWidth { get; set; } = 1920;
     public int MaxHeight { get; set; } = 1080;
@@ -389,7 +389,7 @@ public class CaptureScreenshotResponse : IpcResponse
 // Click / Interaction
 public class ClickElementRequest : IpcRequest
 {
-    public override string RequestType => "ClickElement";
+    public override IpcRequestType RequestType => IpcRequestType.ClickElement;
     public string ElementHandle { get; set; } = string.Empty;
 
     /// <summary>When true, perform a real OS mouse click instead of a UI Automation invoke.</summary>
@@ -412,7 +412,7 @@ public class ClickElementResponse : IpcResponse
 // Set Text / Type into a value-bearing element
 public class SetTextRequest : IpcRequest
 {
-    public override string RequestType => "SetText";
+    public override IpcRequestType RequestType => IpcRequestType.SetText;
     public string ElementHandle { get; set; } = string.Empty;
     public string Text { get; set; } = string.Empty;
 
@@ -431,7 +431,7 @@ public class SetTextResponse : IpcResponse
 // Select an item in a Selector control (ComboBox, ListBox, TabControl, ...)
 public class SelectItemRequest : IpcRequest
 {
-    public override string RequestType => "SelectItem";
+    public override IpcRequestType RequestType => IpcRequestType.SelectItem;
     public string ElementHandle { get; set; } = string.Empty;
 
     /// <summary>Visible text of the item to select (case-insensitive substring). Alternative to Index.</summary>
@@ -453,7 +453,7 @@ public class SelectItemResponse : IpcResponse
 // Send keyboard shortcut / key combination
 public class SendKeysRequest : IpcRequest
 {
-    public override string RequestType => "SendKeys";
+    public override IpcRequestType RequestType => IpcRequestType.SendKeys;
 
     /// <summary>Optional. When omitted, keys go to whatever is currently focused.</summary>
     public string? ElementHandle { get; set; }

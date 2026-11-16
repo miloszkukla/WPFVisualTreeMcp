@@ -110,6 +110,20 @@ public class WpfToolsTests
     }
 
     [Fact]
+    public async Task WpfAttach_ReturnsTypedAttachmentStatusAndSeparateDetails()
+    {
+        _processManagerMock.Setup(x => x.AttachToProcessAsync(1234, null, false)).ReturnsAsync(new InspectionSession
+        {
+            ProcessId = 1234, InspectorStatus = InspectorAttachmentStatus.InjectionFailed, InspectorStatusDetail = "missing DLL"
+        });
+
+        var result = await _tools.WpfAttach(process_id: 1234);
+        var json = System.Text.Json.JsonSerializer.SerializeToElement(result);
+        json.GetProperty("inspector_status").GetString().Should().Be("InjectionFailed");
+        json.GetProperty("inspector_status_detail").GetString().Should().Be("missing DLL");
+    }
+
+    [Fact]
     public async Task WpfGetVisualTree_ReturnsTree()
     {
         // Arrange
@@ -370,7 +384,7 @@ public class WpfToolsTests
             ElementType = "Button",
             AppliedValue = "(20,0,20,0)",
             ValueType = "System.Windows.Thickness",
-            PreviousSource = "Unset"
+            PreviousSource = PreviousPropertySource.Unset
         };
         _ipcBridgeMock
             .Setup(x => x.SetPropertyAsync("elem_1", "Margin", "20,0,20,0"))
@@ -384,7 +398,7 @@ public class WpfToolsTests
             element_type = "Button",
             applied_value = "(20,0,20,0)",
             value_type = "System.Windows.Thickness",
-            previous_source = "Unset"
+            previous_source = PreviousPropertySource.Unset
         });
         _ipcBridgeMock.Verify(x => x.SetPropertyAsync("elem_1", "Margin", "20,0,20,0"), Times.Once);
     }
@@ -513,11 +527,11 @@ public class WpfToolsTests
         };
 
         _ipcBridgeMock
-            .Setup(x => x.GetResourcesAsync("application", null))
+            .Setup(x => x.GetResourcesAsync(ResourceScope.Application, null))
             .ReturnsAsync(expectedResult);
 
         // Act
-        var result = await _tools.WpfGetResources(scope: "application");
+        var result = await _tools.WpfGetResources(scope: ResourceScope.Application);
 
         // Assert
         result.Should().NotBeNull();
@@ -529,7 +543,7 @@ public class WpfToolsTests
     {
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            _tools.WpfGetResources(scope: "element", element_handle: null));
+            _tools.WpfGetResources(scope: ResourceScope.Element, element_handle: null));
     }
 
     [Fact]
@@ -613,17 +627,17 @@ public class WpfToolsTests
         // Arrange
         var expectedResult = new ExportResult
         {
-            Format = "json",
+            Format = TreeExportFormat.Json,
             Content = "{\"root\": {}}",
             ElementCount = 1
         };
 
         _ipcBridgeMock
-            .Setup(x => x.ExportTreeAsync(null, "json"))
+            .Setup(x => x.ExportTreeAsync(null, TreeExportFormat.Json))
             .ReturnsAsync(expectedResult);
 
         // Act
-        var result = await _tools.WpfExportTree(format: "json");
+        var result = await _tools.WpfExportTree(format: TreeExportFormat.Json);
 
         // Assert
         result.Should().NotBeNull();
@@ -636,17 +650,17 @@ public class WpfToolsTests
         // Arrange
         var expectedResult = new ExportResult
         {
-            Format = "xaml",
+            Format = TreeExportFormat.Xaml,
             Content = "<Window />",
             ElementCount = 1
         };
 
         _ipcBridgeMock
-            .Setup(x => x.ExportTreeAsync(null, "xaml"))
+            .Setup(x => x.ExportTreeAsync(null, TreeExportFormat.Xaml))
             .ReturnsAsync(expectedResult);
 
         // Act
-        var result = await _tools.WpfExportTree(format: "xaml");
+        var result = await _tools.WpfExportTree(format: TreeExportFormat.Xaml);
 
         // Assert
         result.Should().NotBeNull();
@@ -658,7 +672,7 @@ public class WpfToolsTests
     {
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            _tools.WpfExportTree(format: "invalid"));
+            _tools.WpfExportTree(format: (TreeExportFormat)999));
     }
 
     [Fact]

@@ -113,7 +113,7 @@ $wpfProcessList = wpfinspect list --compact | ConvertFrom-Json
 $targetProcessId = ($wpfProcessList.processes | Where-Object processName -eq 'MyApp' | Select-Object -First 1).processId
 
 $attachResult = wpfinspect attach --pid $targetProcessId --compact | ConvertFrom-Json
-if ($attachResult.inspectorStatus -like 'Not loaded*') {
+if ($attachResult.inspectorStatus -eq 'NotLoaded') {
     wpfinspect attach --pid $targetProcessId --auto-inject
 }
 

@@ -79,13 +79,19 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
         if (target.SessionId != Process.GetCurrentProcess().SessionId)
             throw new InvalidOperationException("Run this test in the same interactive Windows session as the application.");
         var session = await ObserveAsync(new { ProcessId }, () => processManager.AttachToProcessAsync(ProcessId, null, autoInject: true));
-        if (session.InspectorStatus?.StartsWith("Loaded (", StringComparison.Ordinal) != true)
-            throw new InvalidOperationException("Inspector attach failed for PID " + ProcessId + ": " + session.InspectorStatus);
+        EnsureInspectorReady(session, ProcessId);
         bridge = new NamedPipeBridge(NullLogger<NamedPipeBridge>.Instance, processManager);
         var identity = await ObserveAsync(null, Bridge.GetInspectionIdentityAsync, nameof(GetIdentityAsync));
         if (!identity.Success || string.IsNullOrEmpty(identity.Generation))
             throw new InvalidOperationException(identity.Error ?? "Inspector did not return its identity.");
         generation = identity.Generation;
+    }
+
+    internal static void EnsureInspectorReady(InspectionSession session, int processId)
+    {
+        if (session.InspectorStatus is not (InspectorAttachmentStatus.LoadedExisting or InspectorAttachmentStatus.LoadedInjected))
+            throw new InvalidOperationException("Inspector attach failed for PID " + processId + ": " + session.InspectorStatus +
+                (session.InspectorStatusDetail == null ? "" : ": " + session.InspectorStatusDetail));
     }
 
     public async Task<string> FindAsync(string automationId, string type, string? root = null)

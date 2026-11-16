@@ -99,6 +99,7 @@ public static class CliRunner
                         sessionId = session.SessionId,
                         mainWindowHandle = session.MainWindowHandle,
                         inspectorStatus = session.InspectorStatus,
+                        inspectorStatusDetail = session.InspectorStatusDetail,
                     }, cli);
                     break;
                 }
@@ -225,9 +226,9 @@ public static class CliRunner
                 case "resources":
                 {
                     await AttachAsync(processManager, cli, false);
-                    var scope = cli.GetString("scope", "application");
+                    var scope = ParseEnum<ResourceScope>(cli.GetString("scope", "application"));
                     var handle = cli.GetStringOrNull("handle");
-                    if (scope == "element" && string.IsNullOrEmpty(handle))
+                    if (scope == ResourceScope.Element && string.IsNullOrEmpty(handle))
                         throw new ArgumentException("--handle is required when --scope is 'element'.");
                     WriteJson(await bridge.GetResourcesAsync(scope, handle), cli);
                     break;
@@ -431,9 +432,7 @@ public static class CliRunner
                 case "export":
                 {
                     await AttachAsync(processManager, cli, false);
-                    var format = cli.GetString("format", "json").ToLowerInvariant();
-                    if (format != "json" && format != "xaml")
-                        throw new ArgumentException("--format must be 'json' or 'xaml'.");
+                    var format = ParseEnum<TreeExportFormat>(cli.GetString("format", "json"));
                     var export = await bridge.ExportTreeAsync(cli.GetStringOrNull("handle"), format);
                     var outPath = cli.GetStringOrNull("out");
                     if (!string.IsNullOrEmpty(outPath))

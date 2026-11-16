@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO.Pipes;
 using Microsoft.Extensions.Logging;
 using WpfVisualTreeMcp.Injector;
+using WpfVisualTreeMcp.Shared.Models;
 
 namespace WpfVisualTreeMcp.Server.Services;
 
@@ -141,7 +142,7 @@ public class ProcessManager : IProcessManager
         if (inspectorAvailable)
         {
             _logger.LogInformation("Inspector already running in target process");
-            session.InspectorStatus = "Loaded (existing)";
+            session.InspectorStatus = InspectorAttachmentStatus.LoadedExisting;
         }
         else if (autoInject)
         {
@@ -176,18 +177,20 @@ public class ProcessManager : IProcessManager
                 else
                 {
                     _logger.LogWarning("Injection returned false - Inspector may not have loaded");
-                    session.InspectorStatus = "Injection failed";
+                    session.InspectorStatus = InspectorAttachmentStatus.InjectionFailed;
                 }
             }
             catch (FileNotFoundException ex)
             {
                 _logger.LogError(ex, "Injection failed - required DLL not found: {FileName}", ex.FileName);
-                session.InspectorStatus = $"Injection failed - {ex.FileName} not found";
+                session.InspectorStatus = InspectorAttachmentStatus.InjectionFailed;
+                session.InspectorStatusDetail = $"{ex.FileName} not found";
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Injection failed");
-                session.InspectorStatus = $"Injection failed: {ex.Message}";
+                session.InspectorStatus = InspectorAttachmentStatus.InjectionFailed;
+                session.InspectorStatusDetail = ex.Message;
             }
         }
         else
@@ -195,20 +198,21 @@ public class ProcessManager : IProcessManager
             _logger.LogWarning(
                 "Inspector DLL not loaded in target process. " +
                 "Use autoInject=true to inject automatically, or use self-hosted mode.");
-            session.InspectorStatus = "Not loaded - use autoInject or self-hosted mode";
+            session.InspectorStatus = InspectorAttachmentStatus.NotLoaded;
+            session.InspectorStatusDetail = "Use autoInject or self-hosted mode.";
         }
 
         return session;
     }
 
-    internal static string GetReadyInspectorStatus(bool inspectorWasAlreadyLoaded)
+    internal static InspectorAttachmentStatus GetReadyInspectorStatus(bool inspectorWasAlreadyLoaded)
     {
-        return inspectorWasAlreadyLoaded ? "Loaded (existing)" : "Loaded (injected)";
+        return inspectorWasAlreadyLoaded ? InspectorAttachmentStatus.LoadedExisting : InspectorAttachmentStatus.LoadedInjected;
     }
 
-    internal static string GetPipeTimeoutInspectorStatus(bool inspectorWasAlreadyLoaded)
+    internal static InspectorAttachmentStatus GetPipeTimeoutInspectorStatus(bool inspectorWasAlreadyLoaded)
     {
-        return inspectorWasAlreadyLoaded ? "Loaded (existing) - pipe timeout" : "Injected - pipe timeout";
+        return inspectorWasAlreadyLoaded ? InspectorAttachmentStatus.PipeTimeoutExisting : InspectorAttachmentStatus.PipeTimeoutInjected;
     }
 
     /// <summary>
@@ -349,15 +353,15 @@ public class ProcessManager : IProcessManager
         }
     }
 
-    private string? GetRuntimeType(Process process)
+    private DotNetRuntimeType? GetRuntimeType(Process process)
     {
         try
         {
             foreach (ProcessModule module in process.Modules)
             {
                 var name = module.ModuleName.ToLowerInvariant();
-                if (name == "coreclr.dll") return "CoreCLR";
-                if (name == "clr.dll" || name == "mscorwks.dll") return "Framework";
+                if (name == "coreclr.dll") return DotNetRuntimeType.CoreCLR;
+                if (name == "clr.dll" || name == "mscorwks.dll") return DotNetRuntimeType.Framework;
             }
         }
         catch { }

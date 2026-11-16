@@ -2,12 +2,35 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using WpfVisualTreeMcp.Server.Services;
+using WpfVisualTreeMcp.Server.Controls;
+using WpfVisualTreeMcp.Shared.Models;
 using Xunit;
 
 namespace WpfVisualTreeMcp.Tests;
 
 public class ProcessManagerTests
 {
+    [Theory]
+    [InlineData(InspectorAttachmentStatus.LoadedExisting)]
+    [InlineData(InspectorAttachmentStatus.LoadedInjected)]
+    public void ReadyAttachmentStatesAreAccepted(InspectorAttachmentStatus state)
+    {
+        WpfSession.EnsureInspectorReady(new InspectionSession { InspectorStatus = state }, 123);
+    }
+
+    [Theory]
+    [InlineData(InspectorAttachmentStatus.Unknown)]
+    [InlineData(InspectorAttachmentStatus.PipeTimeoutExisting)]
+    [InlineData(InspectorAttachmentStatus.PipeTimeoutInjected)]
+    [InlineData(InspectorAttachmentStatus.InjectionFailed)]
+    [InlineData(InspectorAttachmentStatus.NotLoaded)]
+    public void UnreadyAttachmentStatesFailWithTheirDetails(InspectorAttachmentStatus state)
+    {
+        var error = Assert.Throws<InvalidOperationException>(() => WpfSession.EnsureInspectorReady(
+            new InspectionSession { InspectorStatus = state, InspectorStatusDetail = "connection details" }, 123));
+        error.Message.Should().Contain(state.ToString()).And.Contain("connection details");
+    }
+
     private readonly Mock<ILogger<ProcessManager>> _loggerMock;
     private readonly ProcessManager _processManager;
 
@@ -67,10 +90,10 @@ public class ProcessManagerTests
     }
 
     [Theory]
-    [InlineData(false, "Loaded (injected)")]
-    [InlineData(true, "Loaded (existing)")]
+    [InlineData(false, InspectorAttachmentStatus.LoadedInjected)]
+    [InlineData(true, InspectorAttachmentStatus.LoadedExisting)]
     public void GetReadyInspectorStatus_ModulePresence_ReportsAccurateProvenance(
-        bool inspectorWasAlreadyLoaded, string expectedStatus)
+        bool inspectorWasAlreadyLoaded, InspectorAttachmentStatus expectedStatus)
     {
         var status = ProcessManager.GetReadyInspectorStatus(inspectorWasAlreadyLoaded);
 
@@ -78,10 +101,10 @@ public class ProcessManagerTests
     }
 
     [Theory]
-    [InlineData(false, "Injected - pipe timeout")]
-    [InlineData(true, "Loaded (existing) - pipe timeout")]
+    [InlineData(false, InspectorAttachmentStatus.PipeTimeoutInjected)]
+    [InlineData(true, InspectorAttachmentStatus.PipeTimeoutExisting)]
     public void GetPipeTimeoutInspectorStatus_ModulePresence_ReportsAccurateProvenance(
-        bool inspectorWasAlreadyLoaded, string expectedStatus)
+        bool inspectorWasAlreadyLoaded, InspectorAttachmentStatus expectedStatus)
     {
         var status = ProcessManager.GetPipeTimeoutInspectorStatus(inspectorWasAlreadyLoaded);
 

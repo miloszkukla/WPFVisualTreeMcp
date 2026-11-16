@@ -12,6 +12,20 @@ namespace WpfVisualTreeMcp.Tests;
 public class BindingResponseTests
 {
     [Fact]
+    public void PropertyValueSourceIsTypedAndUnknownValuesFail()
+    {
+        var bridge = new NamedPipeBridge(NullLogger<NamedPipeBridge>.Instance, Mock.Of<IProcessManager>());
+        var parse = typeof(NamedPipeBridge).GetMethod("ParseElementPropertiesResponse", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var response = new GetElementPropertiesResponse { PropertiesJson = "{\"properties\":[{\"name\":\"Visibility\",\"source\":\"ImplicitStyle\"}]}" };
+        var result = (ElementPropertiesResult)parse.Invoke(bridge, new object[] { response, "element" })!;
+        Assert.Equal(PropertyValueSource.ImplicitStyle, Assert.Single(result.Properties).Source);
+
+        response.PropertiesJson = "{\"properties\":[{\"name\":\"Visibility\",\"source\":\"Unexpected\"}]}";
+        var error = Assert.Throws<TargetInvocationException>(() => parse.Invoke(bridge, new object[] { response, "element" }));
+        Assert.IsType<JsonException>(error.InnerException);
+    }
+
+    [Fact]
     public void UnknownBindingAndLayoutValuesAreNotSilentlyIgnored()
     {
         var bridge = new NamedPipeBridge(NullLogger<NamedPipeBridge>.Instance, Mock.Of<IProcessManager>());

@@ -62,7 +62,7 @@ public class SharedModelsTests
             Name = "Content",
             TypeName = "System.String",
             Value = "Click Me",
-            Source = "Local",
+            Source = PropertyValueSource.Local,
             IsBinding = false
         };
 
@@ -70,7 +70,7 @@ public class SharedModelsTests
         property.Name.Should().Be("Content");
         property.TypeName.Should().Be("System.String");
         property.Value.Should().Be("Click Me");
-        property.Source.Should().Be("Local");
+        property.Source.Should().Be(PropertyValueSource.Local);
         property.IsBinding.Should().BeFalse();
     }
 
@@ -171,13 +171,13 @@ public class SharedModelsTests
         // Arrange & Act
         var export = new ExportResult
         {
-            Format = "json",
+            Format = TreeExportFormat.Json,
             Content = "{\"root\": {}}",
             ElementCount = 42
         };
 
         // Assert
-        export.Format.Should().Be("json");
+        export.Format.Should().Be(TreeExportFormat.Json);
         export.Content.Should().StartWith("{");
         export.ElementCount.Should().Be(42);
     }

@@ -160,7 +160,7 @@ public partial class NamedPipeBridge : IIpcBridge
         return ParseBindingErrorsResponse(response);
     }
 
-    public async Task<ResourcesResult> GetResourcesAsync(string scope, string? elementHandle)
+    public async Task<ResourcesResult> GetResourcesAsync(ResourceScope scope, string? elementHandle)
     {
         var session = EnsureConnected();
 
@@ -441,7 +441,7 @@ public partial class NamedPipeBridge : IIpcBridge
         };
     }
 
-    public async Task<ExportResult> ExportTreeAsync(string? elementHandle, string format)
+    public async Task<ExportResult> ExportTreeAsync(string? elementHandle, TreeExportFormat format)
     {
         var session = EnsureConnected();
 
@@ -827,11 +827,12 @@ public partial class NamedPipeBridge : IIpcBridge
                         Name = prop.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "",
                         TypeName = prop.TryGetProperty("typeName", out var t) ? t.GetString() ?? "" : "",
                         Value = prop.TryGetProperty("value", out var v) ? GetJsonValueAsString(v) : null,
-                        Source = prop.TryGetProperty("source", out var s) ? s.GetString() ?? "Unknown" : "Unknown"
+                        Source = prop.TryGetProperty("source", out var s) ? s.Deserialize<PropertyValueSource>() : PropertyValueSource.Unknown
                     });
                 }
             }
         }
+        catch (JsonException) { throw; }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to parse properties JSON");

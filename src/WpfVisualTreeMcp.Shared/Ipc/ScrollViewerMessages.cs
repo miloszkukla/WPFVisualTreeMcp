@@ -4,7 +4,7 @@ namespace WpfVisualTreeMcp.Shared.Ipc;
 
 public class ScrollViewerRequest : IpcRequest
 {
-    public override string RequestType => "ScrollViewer";
+    public override IpcRequestType RequestType => IpcRequestType.ScrollViewer;
     public string ElementHandle { get; set; } = string.Empty;
     public ScrollViewerAction Action { get; set; }
     public string? Generation { get; set; }
@@ -20,7 +20,7 @@ public class ScrollViewerResponse : IpcResponse
 
 public class ScrollItemIntoViewRequest : IpcRequest
 {
-    public override string RequestType => "ScrollItemIntoView";
+    public override IpcRequestType RequestType => IpcRequestType.ScrollItemIntoView;
     public string ListHandle { get; set; } = string.Empty;
     public int Index { get; set; } = -1;
     public string? Generation { get; set; }

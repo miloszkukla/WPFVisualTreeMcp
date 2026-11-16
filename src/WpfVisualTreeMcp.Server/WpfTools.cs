@@ -57,7 +57,8 @@ public partial class WpfTools
             process_id = session.ProcessId,
             session_id = session.SessionId,
             main_window_handle = session.MainWindowHandle,
-            inspector_status = session.InspectorStatus
+            inspector_status = session.InspectorStatus,
+            inspector_status_detail = session.InspectorStatusDetail
         };
     }
 
@@ -182,9 +183,10 @@ public partial class WpfTools
 
     [McpServerTool]
     [Description("Enumerate resource dictionaries and their contents")]
-    public async Task<object> WpfGetResources(string scope = "application", string? element_handle = null)
+    public async Task<object> WpfGetResources(ResourceScope scope = ResourceScope.Application, string? element_handle = null)
     {
-        if (scope == "element" && string.IsNullOrEmpty(element_handle))
+        if (!Enum.IsDefined(scope)) throw new ArgumentOutOfRangeException(nameof(scope));
+        if (scope == ResourceScope.Element && string.IsNullOrEmpty(element_handle))
         {
             throw new ArgumentException("element_handle is required when scope is 'element'");
         }
@@ -382,9 +384,9 @@ public partial class WpfTools
 
     [McpServerTool]
     [Description("Export visual tree to XAML or JSON")]
-    public async Task<object> WpfExportTree(string? element_handle = null, string format = "json")
+    public async Task<object> WpfExportTree(string? element_handle = null, TreeExportFormat format = TreeExportFormat.Json)
     {
-        if (format != "json" && format != "xaml")
+        if (!Enum.IsDefined(format))
         {
             throw new ArgumentException("format must be 'json' or 'xaml'");
         }
