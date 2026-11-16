@@ -82,7 +82,7 @@ public class ScrollViewerSerializerTests
             RequestId = "request-1",
             Success = false,
             Error = "Stale inspection generation.",
-            Method = "ScrollViewer.PageDown",
+            Method = InteractionMethod.ScrollViewerPageDown,
             ElementType = "System.Windows.Controls.ScrollViewer",
             Detail = "Issued once"
         };

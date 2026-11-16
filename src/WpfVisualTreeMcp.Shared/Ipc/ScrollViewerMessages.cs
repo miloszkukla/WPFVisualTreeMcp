@@ -13,7 +13,7 @@ public class ScrollViewerRequest : IpcRequest
 
 public class ScrollViewerResponse : IpcResponse
 {
-    public string? Method { get; set; }
+    public InteractionMethod? Method { get; set; }
     public string? ElementType { get; set; }
     public string? Detail { get; set; }
 }

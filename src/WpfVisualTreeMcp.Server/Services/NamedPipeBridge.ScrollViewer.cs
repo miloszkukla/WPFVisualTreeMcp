@@ -24,7 +24,7 @@ public partial class NamedPipeBridge
 
         return new ScrollViewerResult
         {
-            Method = response.Method ?? "Unknown",
+            Method = response.Method ?? InteractionMethod.Unknown,
             ElementType = response.ElementType,
             Detail = response.Detail
         };
@@ -49,7 +49,7 @@ public partial class NamedPipeBridge
 
         return new ScrollViewerResult
         {
-            Method = response.Method ?? "Unknown",
+            Method = response.Method ?? InteractionMethod.Unknown,
             ElementType = response.ElementType,
             Detail = response.Detail
         };

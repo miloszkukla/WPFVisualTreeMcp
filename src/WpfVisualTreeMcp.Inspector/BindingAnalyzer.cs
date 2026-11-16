@@ -5,6 +5,9 @@ using System.Diagnostics;
 using System.Text;
 using System.Windows;
 using System.Windows.Data;
+using BindingErrorType = WpfVisualTreeMcp.Shared.Models.BindingErrorType;
+using BindingSourceKind = WpfVisualTreeMcp.Shared.Models.BindingSourceKind;
+using BindingRelativeSourceMode = WpfVisualTreeMcp.Shared.Models.BindingRelativeSourceMode;
 
 namespace WpfVisualTreeMcp.Inspector;
 
@@ -190,8 +193,9 @@ public class BindingAnalyzer
             sb.Append($",\"targetNullValue\":\"{EscapeJson(FormatValueShort(binding.TargetNullValue))}\"");
 
         // Resolve the binding's source root and its kind.
-        var (root, sourceKind) = ResolveBindingSource(element, binding);
+        var (root, sourceKind, relativeSourceMode) = ResolveBindingSource(element, binding);
         sb.Append($",\"sourceKind\":\"{sourceKind}\"");
+        if (relativeSourceMode.HasValue) sb.Append($",\"relativeSourceMode\":\"{relativeSourceMode}\"");
         sb.Append($",\"sourceType\":\"{EscapeJson(root?.GetType().FullName ?? "null")}\"");
 
         // Validation error, if any.
@@ -337,19 +341,19 @@ public class BindingAnalyzer
     }
 
     /// <summary>Resolves the object a binding reads from (Source / ElementName / RelativeSource / DataContext).</summary>
-    private static (object? root, string kind) ResolveBindingSource(DependencyObject element, Binding binding)
+    private static (object? root, BindingSourceKind kind, BindingRelativeSourceMode? relativeSourceMode) ResolveBindingSource(DependencyObject element, Binding binding)
     {
         if (binding.Source != null)
-            return (binding.Source, "Source");
+            return (binding.Source, BindingSourceKind.Source, null);
 
         if (!string.IsNullOrEmpty(binding.ElementName))
         {
             if (element is FrameworkElement fe)
             {
                 var named = fe.FindName(binding.ElementName);
-                return (named, "ElementName");
+                return (named, BindingSourceKind.ElementName, null);
             }
-            return (null, "ElementName");
+            return (null, BindingSourceKind.ElementName, null);
         }
 
         if (binding.RelativeSource != null)
@@ -358,18 +362,20 @@ public class BindingAnalyzer
             switch (rs.Mode)
             {
                 case RelativeSourceMode.Self:
-                    return (element, "RelativeSource.Self");
+                    return (element, BindingSourceKind.RelativeSource, BindingRelativeSourceMode.Self);
                 case RelativeSourceMode.TemplatedParent:
-                    return ((element as FrameworkElement)?.TemplatedParent, "RelativeSource.TemplatedParent");
+                    return ((element as FrameworkElement)?.TemplatedParent, BindingSourceKind.RelativeSource, BindingRelativeSourceMode.TemplatedParent);
                 case RelativeSourceMode.FindAncestor:
-                    return (FindAncestor(element, rs.AncestorType, Math.Max(1, rs.AncestorLevel)), "RelativeSource.FindAncestor");
+                    return (FindAncestor(element, rs.AncestorType, Math.Max(1, rs.AncestorLevel)), BindingSourceKind.RelativeSource, BindingRelativeSourceMode.FindAncestor);
+                case RelativeSourceMode.PreviousData:
+                    return (null, BindingSourceKind.RelativeSource, BindingRelativeSourceMode.PreviousData);
                 default:
-                    return (null, $"RelativeSource.{rs.Mode}");
+                    throw new ArgumentOutOfRangeException(nameof(rs.Mode), rs.Mode, "Unknown relative source mode.");
             }
         }
 
         // Default: the element's DataContext.
-        return ((element as FrameworkElement)?.DataContext, "DataContext");
+        return ((element as FrameworkElement)?.DataContext, BindingSourceKind.DataContext, null);
     }
 
     private static object? FindAncestor(DependencyObject element, Type? ancestorType, int level)
@@ -431,7 +437,7 @@ public class BindingAnalyzer
             }
             sb.Append($",\"property\":\"{EscapeJson(error.Property)}\"");
             sb.Append($",\"bindingPath\":\"{EscapeJson(error.BindingPath)}\"");
-            sb.Append($",\"errorType\":\"{EscapeJson(error.ErrorType)}\"");
+            sb.Append($",\"errorType\":\"{error.ErrorType}\"");
             sb.Append($",\"message\":\"{EscapeJson(error.Message)}\"");
             sb.Append($",\"timestamp\":\"{error.Timestamp:yyyy-MM-ddTHH:mm:ss.fffZ}\"");
             sb.Append("}");
@@ -801,7 +807,7 @@ public class BindingAnalyzer
         public string? ElementName { get; set; }
         public string Property { get; set; } = string.Empty;
         public string BindingPath { get; set; } = string.Empty;
-        public string ErrorType { get; set; } = string.Empty;
+        public BindingErrorType ErrorType { get; set; }
         public string Message { get; set; } = string.Empty;
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
     }
@@ -860,17 +866,17 @@ public class BindingAnalyzer
 
             // Determine error type
             if (message.Contains("Cannot find source"))
-                error.ErrorType = "SourceNotFound";
+                error.ErrorType = BindingErrorType.SourceNotFound;
             else if (message.Contains("path error") || message.Contains("BindingExpression path error"))
-                error.ErrorType = "PathError";
+                error.ErrorType = BindingErrorType.PathError;
             else if (message.Contains("Cannot convert"))
-                error.ErrorType = "ConversionError";
+                error.ErrorType = BindingErrorType.ConversionError;
             else if (message.Contains("ValidationError"))
-                error.ErrorType = "ValidationError";
+                error.ErrorType = BindingErrorType.ValidationError;
             else if (message.Contains("UpdateSourceExceptionFilter"))
-                error.ErrorType = "UpdateSourceError";
+                error.ErrorType = BindingErrorType.UpdateSourceError;
             else
-                error.ErrorType = "Unknown";
+                error.ErrorType = BindingErrorType.Unknown;
 
             // Extract binding path
             var pathMatch = System.Text.RegularExpressions.Regex.Match(

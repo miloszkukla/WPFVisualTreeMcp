@@ -15,6 +15,7 @@ using System.Windows.Interop;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
+using ClrReadKind = WpfVisualTreeMcp.Shared.Models.ClrReadKind;
 
 namespace WpfVisualTreeMcp.Inspector;
 
@@ -31,12 +32,12 @@ public sealed class ClrReader
         var value = Resolve(root, path);
         if (membersOnly)
         {
-            if (value == null) return JsonSerializer.Serialize(new { kind = "null", members = new object[0] }, Options);
+            if (value == null) return JsonSerializer.Serialize(new { kind = ClrReadKind.Null, members = new object[0] }, Options);
             var members = value.GetType().GetMembers(BindingFlags.Public | BindingFlags.Instance)
                 .Where(m => m is PropertyInfo || m is FieldInfo || m is MethodInfo method && !method.IsSpecialName)
                 .Select(m => new { name = m.Name, kind = m.MemberType.ToString(), signature = m.ToString() })
                 .OrderBy(m => m.name, StringComparer.Ordinal).ThenBy(m => m.signature, StringComparer.Ordinal).ToArray();
-            return JsonSerializer.Serialize(new { kind = "members", type = value.GetType().FullName,
+            return JsonSerializer.Serialize(new { kind = ClrReadKind.Members, type = value.GetType().FullName,
                 totalCount = members.Length, skip, truncated = members.Length > skip + take, members = members.Skip(skip).Take(take).ToArray() }, Options);
         }
         if (value is IEnumerable enumerable && !(value is string))
@@ -63,11 +64,11 @@ public sealed class ClrReader
                 if (!deadlineReached) hasMore = iterator.MoveNext();
             }
             finally { (iterator as IDisposable)?.Dispose(); }
-            return JsonSerializer.Serialize(new { kind = "collection", type = value.GetType().FullName,
+            return JsonSerializer.Serialize(new { kind = ClrReadKind.Collection, type = value.GetType().FullName,
                 totalCount = value is ICollection collection ? (int?)collection.Count : null,
                 skip, returned = rows.Count, truncated = hasMore || deadlineReached, deadlineReached, items = rows }, Options);
         }
-        return JsonSerializer.Serialize(new { kind = fields.Length == 0 ? "value" : "object", value = Project(value, fields) }, Options);
+        return JsonSerializer.Serialize(new { kind = fields.Length == 0 ? ClrReadKind.Value : ClrReadKind.Object, value = Project(value, fields) }, Options);
     }
 
     public static object? Resolve(object? current, string path)

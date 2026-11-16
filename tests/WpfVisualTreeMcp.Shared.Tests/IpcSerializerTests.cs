@@ -15,6 +15,22 @@ namespace WpfVisualTreeMcp.Tests;
 public class IpcSerializerTests
 {
     [Fact]
+    public void NotificationsAndInteractionMethodsSerializeAsTypedStrings()
+    {
+        using var notification = JsonDocument.Parse(IpcSerializer.Serialize(new PropertyChangedNotification()));
+        notification.RootElement.GetProperty("notificationType").Deserialize<NotificationType>().Should().Be(NotificationType.PropertyChanged);
+        using var bindingError = JsonDocument.Parse(IpcSerializer.Serialize(new BindingErrorNotification()));
+        bindingError.RootElement.GetProperty("notificationType").Deserialize<NotificationType>().Should().Be(NotificationType.BindingError);
+
+        var response = IpcSerializer.DeserializeResponse<ClickElementResponse>("{\"success\":true,\"method\":\"physicaldoubleclick\"}");
+        response!.Method.Should().Be(InteractionMethod.PhysicalDoubleClick);
+        Action numeric = () => IpcSerializer.DeserializeResponse<ClickElementResponse>("{\"method\":1}");
+        Action unknown = () => IpcSerializer.DeserializeResponse<ClickElementResponse>("{\"method\":\"other\"}");
+        numeric.Should().Throw<JsonException>();
+        unknown.Should().Throw<JsonException>();
+    }
+
+    [Fact]
     public void RequestTypeRoundTripsAndRejectsUnknownOrNumericDiscriminators()
     {
         var request = new ClrReadRequest { ElementHandle = "element" };

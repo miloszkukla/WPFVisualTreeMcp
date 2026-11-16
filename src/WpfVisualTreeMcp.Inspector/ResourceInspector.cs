@@ -7,6 +7,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using ResourceScope = WpfVisualTreeMcp.Shared.Models.ResourceScope;
+using PropertyAttributionKind = WpfVisualTreeMcp.Shared.Models.PropertyAttributionKind;
+using PropertyValueSource = WpfVisualTreeMcp.Shared.Models.PropertyValueSource;
 
 namespace WpfVisualTreeMcp.Inspector;
 
@@ -341,7 +343,7 @@ public class ResourceInspector
 
         sb.Append("{");
         sb.Append($"\"property\":\"{EscapeJson(propertyName)}\"");
-        sb.Append($",\"valueSource\":\"{vs.BaseValueSource}\"");
+        sb.Append($",\"valueSource\":\"{PropertyReader.GetSourceName(vs.BaseValueSource)}\"");
         sb.Append($",\"effectiveValue\":{FormatValue(current)}");
         sb.Append(",\"setBy\":");
 
@@ -358,16 +360,16 @@ public class ResourceInspector
                 AppendActiveTriggerSource(sb, element, dp, vs.BaseValueSource);
                 break;
             case BaseValueSource.Local:
-                sb.Append("{\"kind\":\"Local\",\"detail\":\"Set directly on the element (local value), overriding any style/trigger.\"}");
+                sb.Append($"{{\"kind\":\"{PropertyAttributionKind.ValueSource}\",\"valueSource\":\"{PropertyValueSource.Local}\",\"detail\":\"Set directly on the element (local value), overriding any style/trigger.\"}}");
                 break;
             case BaseValueSource.ParentTemplate:
-                sb.Append("{\"kind\":\"ParentTemplate\",\"detail\":\"Set by the ControlTemplate that contains this element.\"}");
+                sb.Append($"{{\"kind\":\"{PropertyAttributionKind.ValueSource}\",\"valueSource\":\"{PropertyValueSource.ParentTemplate}\",\"detail\":\"Set by the ControlTemplate that contains this element.\"}}");
                 break;
             case BaseValueSource.Inherited:
-                sb.Append("{\"kind\":\"Inherited\",\"detail\":\"Inherited from an ancestor element.\"}");
+                sb.Append($"{{\"kind\":\"{PropertyAttributionKind.ValueSource}\",\"valueSource\":\"{PropertyValueSource.Inherited}\",\"detail\":\"Inherited from an ancestor element.\"}}");
                 break;
             default:
-                sb.Append($"{{\"kind\":\"{vs.BaseValueSource}\"}}");
+                sb.Append($"{{\"kind\":\"{PropertyAttributionKind.ValueSource}\",\"valueSource\":\"{PropertyReader.GetSourceName(vs.BaseValueSource)}\"}}");
                 break;
         }
 
@@ -383,14 +385,14 @@ public class ResourceInspector
                 if (sbase is Setter s && s.Property == dp)
                 {
                     sb.Append("{");
-                    sb.Append($"\"kind\":\"StyleSetter\",\"style\":\"{EscapeJson(style.TargetType?.Name ?? "Style")}\"");
+                    sb.Append($"\"kind\":\"{PropertyAttributionKind.StyleSetter}\",\"style\":\"{EscapeJson(style.TargetType?.Name ?? "Style")}\"");
                     sb.Append($",\"setter\":\"{EscapeJson(dp.Name)}\",\"value\":{FormatValue(s.Value)}");
                     sb.Append("}");
                     return;
                 }
             }
         }
-        sb.Append("{\"kind\":\"StyleSetter\",\"detail\":\"Set by a style setter (exact setter not located; may come from an implicit or default style).\"}");
+        sb.Append($"{{\"kind\":\"{PropertyAttributionKind.StyleSetter}\",\"detail\":\"Set by a style setter (exact setter not located; may come from an implicit or default style).\"}}");
     }
 
     private void AppendActiveTriggerSource(StringBuilder sb, FrameworkElement element, DependencyProperty dp, BaseValueSource source)
@@ -414,7 +416,7 @@ public class ResourceInspector
                     if (sbase is Setter s && s.Property == dp)
                     {
                         sb.Append("{");
-                        sb.Append($"\"kind\":\"ActiveTrigger\",\"origin\":\"{EscapeJson(origin)}\"");
+                        sb.Append($"\"kind\":\"{PropertyAttributionKind.ActiveTrigger}\",\"origin\":\"{EscapeJson(origin)}\"");
                         sb.Append($",\"condition\":\"{EscapeJson(DescribeTriggerCondition(trg))}\"");
                         sb.Append($",\"setter\":\"{EscapeJson(dp.Name)}\",\"value\":{FormatValue(s.Value)}");
                         sb.Append("}");
@@ -423,7 +425,7 @@ public class ResourceInspector
                 }
             }
         }
-        sb.Append($"{{\"kind\":\"Trigger\",\"detail\":\"Value comes from {source} — see the active trigger in styleTriggers/templateTriggers above.\"}}");
+        sb.Append($"{{\"kind\":\"{PropertyAttributionKind.Trigger}\",\"detail\":\"Value comes from {source} — see the active trigger in styleTriggers/templateTriggers above.\"}}");
     }
 
     private bool TriggerIsActive(TriggerBase trigger, FrameworkElement element)

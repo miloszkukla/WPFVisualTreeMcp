@@ -6,10 +6,10 @@ namespace WpfVisualTreeMcp.Shared.Models;
 public class ClickResult
 {
     /// <summary>
-    /// How the click was carried out — e.g. "Invoke", "Toggle", "SelectionItem.Select",
-    /// "ExpandCollapse.Expand", "SyntheticMouse", or "Physical".
+    /// How the click was carried out — e.g. "Invoke", "Toggle", "SelectionItemSelect",
+    /// "ExpandCollapseExpand", "SyntheticMouse", or "Physical".
     /// </summary>
-    public string Method { get; set; } = string.Empty;
+    public InteractionMethod Method { get; set; }
 
     /// <summary>The runtime type name of the clicked element.</summary>
     public string? ElementType { get; set; }
@@ -24,10 +24,10 @@ public class ClickResult
 public class SetTextResult
 {
     /// <summary>
-    /// How the value was applied — e.g. "ValueProvider.SetValue",
-    /// "DirectProperty.Text", "DirectProperty.Password", "Reflected.Text", "Physical".
+    /// How the value was applied — e.g. "ValueProviderSetValue",
+    /// "DirectPropertyText", "DirectPropertyPassword", "ReflectedText", "Physical".
     /// </summary>
-    public string Method { get; set; } = string.Empty;
+    public InteractionMethod Method { get; set; }
 
     /// <summary>The runtime type name of the target element.</summary>
     public string? ElementType { get; set; }
@@ -41,8 +41,8 @@ public class SetTextResult
 /// </summary>
 public class SelectItemResult
 {
-    /// <summary>How the selection was carried out (currently "Selector.SelectedIndex").</summary>
-    public string Method { get; set; } = string.Empty;
+    /// <summary>How the selection was carried out (currently "SelectorSelectedIndex").</summary>
+    public InteractionMethod Method { get; set; }
 
     /// <summary>The runtime type name of the Selector control.</summary>
     public string? ElementType { get; set; }
@@ -57,7 +57,7 @@ public class SelectItemResult
 public class SendKeysResult
 {
     /// <summary>How the keys were sent (currently always "Physical").</summary>
-    public string Method { get; set; } = string.Empty;
+    public InteractionMethod Method { get; set; }
 
     /// <summary>The runtime type name of the targeted element (null if no element was specified).</summary>
     public string? ElementType { get; set; }

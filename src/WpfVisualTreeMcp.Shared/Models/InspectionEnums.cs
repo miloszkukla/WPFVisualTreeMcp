@@ -37,3 +37,17 @@ public enum PreviousPropertySource { Binding, Local, Unset }
 public enum DotNetRuntimeType { Framework, CoreCLR }
 [JsonConverter(typeof(InspectionEnumConverter))]
 public enum InspectorAttachmentStatus { Unknown, LoadedExisting, LoadedInjected, PipeTimeoutExisting, PipeTimeoutInjected, InjectionFailed, NotLoaded }
+[JsonConverter(typeof(InspectionEnumConverter))]
+public enum ClrReadKind { Null, Members, Collection, Value, Object }
+[JsonConverter(typeof(InspectionEnumConverter))]
+public enum BindingErrorType { Unknown, SourceNotFound, PathError, ConversionError, ValidationError, UpdateSourceError }
+[JsonConverter(typeof(InspectionEnumConverter))]
+public enum BindingSourceKind { Source, ElementName, RelativeSource, DataContext }
+[JsonConverter(typeof(InspectionEnumConverter))]
+public enum BindingRelativeSourceMode { Self, TemplatedParent, FindAncestor, PreviousData }
+[JsonConverter(typeof(InspectionEnumConverter))]
+public enum PropertyAttributionKind { ValueSource, StyleSetter, ActiveTrigger, Trigger }
+[JsonConverter(typeof(InspectionEnumConverter))]
+public enum InteractionMethod { Unknown, Invoke, Toggle, SelectionItemSelect, ExpandCollapseExpand, ExpandCollapseCollapse, SyntheticMouse, PhysicalDoubleClick, PhysicalRightClick, Physical, ValueProviderSetValue, DirectPropertyText, DirectPropertyPassword, ReflectedText, SelectorSelectedIndex, ListBoxScrollIntoView, ScrollViewerHome, ScrollViewerPageDown, ScrollViewerPageUp, ScrollViewerEnd }
+[JsonConverter(typeof(InspectionEnumConverter))]
+public enum NotificationType { PropertyChanged, BindingError }

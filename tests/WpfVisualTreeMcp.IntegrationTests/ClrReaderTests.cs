@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using WpfVisualTreeMcp.Inspector;
+using WpfVisualTreeMcp.Shared.Models;
 using Xunit;
 
 namespace WpfVisualTreeMcp.IntegrationTests;
@@ -29,6 +30,7 @@ public class ClrReaderTests
     {
         using var result = JsonDocument.Parse(new ClrReader().Read(new Model(), "Entries", new[] { "Code", "CodeStatus" }, 1, 1));
         var root = result.RootElement;
+        Assert.Equal(ClrReadKind.Collection, root.GetProperty("kind").Deserialize<ClrReadKind>());
         Assert.Equal(3, root.GetProperty("totalCount").GetInt32());
         Assert.True(root.GetProperty("truncated").GetBoolean());
         Assert.Equal("B", root.GetProperty("items")[0].GetProperty("Code").GetProperty("value").GetString());
@@ -39,6 +41,7 @@ public class ClrReaderTests
     public void NestedIndexedPathReadsScalarWithoutTraversingObjectGraph()
     {
         using var result = JsonDocument.Parse(new ClrReader().Read(new Model(), "Entries[2].Code", Array.Empty<string>(), 0, 1));
+        Assert.Equal(ClrReadKind.Value, result.RootElement.GetProperty("kind").Deserialize<ClrReadKind>());
         Assert.Equal("C", result.RootElement.GetProperty("value").GetString());
     }
 
@@ -56,6 +59,7 @@ public class ClrReaderTests
     public void NullMissingAndThrowingMembersRemainDistinct()
     {
         using var result = JsonDocument.Parse(new ClrReader().Read(new Model(), "", new[] { "Child", "Missing", "Throws", "Entries" }, 0, 1));
+        Assert.Equal(ClrReadKind.Object, result.RootElement.GetProperty("kind").Deserialize<ClrReadKind>());
         var root = result.RootElement.GetProperty("value");
         Assert.Equal(JsonValueKind.Null, root.GetProperty("Child").GetProperty("value").ValueKind);
         Assert.True(root.GetProperty("Missing").GetProperty("missing").GetBoolean());
@@ -68,8 +72,16 @@ public class ClrReaderTests
     {
         var model = new Model();
         using var result = JsonDocument.Parse(new ClrReader().Read(model, "", Array.Empty<string>(), 0, 100, true));
+        Assert.Equal(ClrReadKind.Members, result.RootElement.GetProperty("kind").Deserialize<ClrReadKind>());
         Assert.Contains(result.RootElement.GetProperty("members").EnumerateArray(), item => item.GetProperty("name").GetString() == "Mutate");
         Assert.Equal(0, model.Calls);
+    }
+
+    [Fact]
+    public void MembersOnNullReportNullKind()
+    {
+        using var result = JsonDocument.Parse(new ClrReader().Read(new Model(), "Child", Array.Empty<string>(), 0, 1, true));
+        Assert.Equal(ClrReadKind.Null, result.RootElement.GetProperty("kind").Deserialize<ClrReadKind>());
     }
 
     [Theory]

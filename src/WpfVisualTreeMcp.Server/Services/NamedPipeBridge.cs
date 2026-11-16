@@ -558,7 +558,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         return new ClickResult
         {
-            Method = response.Method ?? "Unknown",
+            Method = response.Method ?? InteractionMethod.Unknown,
             ElementType = response.ElementType,
             Detail = response.Detail
         };
@@ -585,7 +585,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         return new SelectItemResult
         {
-            Method = response.Method ?? "Unknown",
+            Method = response.Method ?? InteractionMethod.Unknown,
             ElementType = response.ElementType,
             Detail = response.Detail
         };
@@ -612,7 +612,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         return new SetTextResult
         {
-            Method = response.Method ?? "Unknown",
+            Method = response.Method ?? InteractionMethod.Unknown,
             ElementType = response.ElementType,
             Detail = response.Detail
         };
@@ -638,7 +638,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         return new SendKeysResult
         {
-            Method = response.Method ?? "Unknown",
+            Method = response.Method ?? InteractionMethod.Unknown,
             ElementType = response.ElementType,
             Detail = response.Detail
         };
@@ -1040,12 +1040,17 @@ public partial class NamedPipeBridge : IIpcBridge
                     ElementName = error.TryGetProperty("elementName", out var en) ? en.GetString() : null,
                     Property = error.TryGetProperty("property", out var p) ? p.GetString() ?? "" : "",
                     BindingPath = error.TryGetProperty("bindingPath", out var bp) ? bp.GetString() ?? "" : "",
+                    ErrorType = error.TryGetProperty("errorType", out var type) ? type.Deserialize<BindingErrorType>() : BindingErrorType.Unknown,
                     Message = error.TryGetProperty("message", out var m) ? m.GetString() ?? "" : "",
                     Timestamp = error.TryGetProperty("timestamp", out var ts)
                         ? DateTime.Parse(ts.GetString() ?? DateTime.UtcNow.ToString())
                         : DateTime.UtcNow
                 });
             }
+        }
+        catch (JsonException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

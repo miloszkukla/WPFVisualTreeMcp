@@ -402,7 +402,7 @@ public class ClickElementRequest : IpcRequest
 public class ClickElementResponse : IpcResponse
 {
     /// <summary>How the click was carried out: Invoke, Toggle, SelectionItem.Select, ExpandCollapse.*, SyntheticMouse, Physical.</summary>
-    public string? Method { get; set; }
+    public InteractionMethod? Method { get; set; }
     public string? ElementType { get; set; }
 
     /// <summary>Optional extra detail, e.g. the resulting toggle state or click coordinates.</summary>
@@ -423,7 +423,7 @@ public class SetTextRequest : IpcRequest
 public class SetTextResponse : IpcResponse
 {
     /// <summary>How the value was applied: ValueProvider.SetValue, DirectProperty.Text, DirectProperty.Password, Reflected.Text, Physical.</summary>
-    public string? Method { get; set; }
+    public InteractionMethod? Method { get; set; }
     public string? ElementType { get; set; }
     public string? Detail { get; set; }
 }
@@ -443,7 +443,7 @@ public class SelectItemRequest : IpcRequest
 
 public class SelectItemResponse : IpcResponse
 {
-    public string? Method { get; set; }
+    public InteractionMethod? Method { get; set; }
     public string? ElementType { get; set; }
 
     /// <summary>Which item ended up selected (index and display text).</summary>
@@ -464,7 +464,7 @@ public class SendKeysRequest : IpcRequest
 
 public class SendKeysResponse : IpcResponse
 {
-    public string? Method { get; set; }
+    public InteractionMethod? Method { get; set; }
     public string? ElementType { get; set; }
     public string? Detail { get; set; }
 }
@@ -472,7 +472,7 @@ public class SendKeysResponse : IpcResponse
 // Notifications (Inspector -> Server)
 public class PropertyChangedNotification
 {
-    public string NotificationType => "PropertyChanged";
+    public NotificationType NotificationType => NotificationType.PropertyChanged;
     public string WatchId { get; set; } = string.Empty;
     public string PropertyName { get; set; } = string.Empty;
     public string? OldValue { get; set; }
@@ -482,7 +482,7 @@ public class PropertyChangedNotification
 
 public class BindingErrorNotification
 {
-    public string NotificationType => "BindingError";
+    public NotificationType NotificationType => NotificationType.BindingError;
     public string ElementType { get; set; } = string.Empty;
     public string? ElementName { get; set; }
     public string Property { get; set; } = string.Empty;

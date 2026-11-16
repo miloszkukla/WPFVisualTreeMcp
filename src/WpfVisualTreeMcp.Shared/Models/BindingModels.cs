@@ -33,7 +33,7 @@ public class BindingError
     public string? ElementName { get; set; }
     public string Property { get; set; } = string.Empty;
     public string BindingPath { get; set; } = string.Empty;
-    public string ErrorType { get; set; } = string.Empty;
+    public BindingErrorType ErrorType { get; set; }
     public string Message { get; set; } = string.Empty;
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 }

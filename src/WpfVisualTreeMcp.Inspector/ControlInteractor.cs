@@ -31,14 +31,14 @@ internal sealed class ControlInteractor
     /// <summary>Describes how an interaction was carried out.</summary>
     public readonly struct InteractionOutcome
     {
-        public InteractionOutcome(string method, string? detail)
+        public InteractionOutcome(InteractionMethod method, string? detail)
         {
             Method = method;
             Detail = detail;
         }
 
         /// <summary>The mechanism used (Invoke, Toggle, Physical, ValueProvider.SetValue, ...).</summary>
-        public string Method { get; }
+        public InteractionMethod Method { get; }
 
         /// <summary>Optional extra detail (resulting toggle state, click coordinates, key combo, ...).</summary>
         public string? Detail { get; }
@@ -76,19 +76,19 @@ internal sealed class ControlInteractor
             if (peer.GetPattern(PatternInterface.Invoke) is IInvokeProvider invoke)
             {
                 invoke.Invoke();
-                return new InteractionOutcome("Invoke", null);
+                return new InteractionOutcome(InteractionMethod.Invoke, null);
             }
 
             if (peer.GetPattern(PatternInterface.Toggle) is IToggleProvider toggle)
             {
                 toggle.Toggle();
-                return new InteractionOutcome("Toggle", $"new toggle state: {toggle.ToggleState}");
+                return new InteractionOutcome(InteractionMethod.Toggle, $"new toggle state: {toggle.ToggleState}");
             }
 
             if (peer.GetPattern(PatternInterface.SelectionItem) is ISelectionItemProvider selectionItem)
             {
                 selectionItem.Select();
-                return new InteractionOutcome("SelectionItem.Select", null);
+                return new InteractionOutcome(InteractionMethod.SelectionItemSelect, null);
             }
 
             if (peer.GetPattern(PatternInterface.ExpandCollapse) is IExpandCollapseProvider expandCollapse)
@@ -96,11 +96,11 @@ internal sealed class ControlInteractor
                 if (expandCollapse.ExpandCollapseState == ExpandCollapseState.Collapsed)
                 {
                     expandCollapse.Expand();
-                    return new InteractionOutcome("ExpandCollapse.Expand", null);
+                    return new InteractionOutcome(InteractionMethod.ExpandCollapseExpand, null);
                 }
 
                 expandCollapse.Collapse();
-                return new InteractionOutcome("ExpandCollapse.Collapse", null);
+                return new InteractionOutcome(InteractionMethod.ExpandCollapseCollapse, null);
             }
         }
 
@@ -127,7 +127,7 @@ internal sealed class ControlInteractor
         Raise(UIElement.MouseLeftButtonUpEvent);
 
         return new InteractionOutcome(
-            "SyntheticMouse",
+            InteractionMethod.SyntheticMouse,
             "element exposes no UI Automation pattern; raised routed mouse events (best-effort)");
     }
 
@@ -152,13 +152,13 @@ internal sealed class ControlInteractor
             case ClickType.Double:
                 NativeMethods.MouseLeftClick();
                 NativeMethods.MouseLeftClick();
-                return new InteractionOutcome("Physical.DoubleClick", $"OS mouse double-click at screen ({x},{y})");
+                return new InteractionOutcome(InteractionMethod.PhysicalDoubleClick, $"OS mouse double-click at screen ({x},{y})");
             case ClickType.Right:
                 NativeMethods.MouseRightClick();
-                return new InteractionOutcome("Physical.RightClick", $"OS mouse right-click at screen ({x},{y})");
+                return new InteractionOutcome(InteractionMethod.PhysicalRightClick, $"OS mouse right-click at screen ({x},{y})");
             default:
                 NativeMethods.MouseLeftClick();
-                return new InteractionOutcome("Physical", $"OS mouse click at screen ({x},{y})");
+                return new InteractionOutcome(InteractionMethod.Physical, $"OS mouse click at screen ({x},{y})");
         }
     }
 
@@ -202,20 +202,20 @@ internal sealed class ControlInteractor
             if (value.IsReadOnly)
                 throw new InvalidOperationException("Element value is read-only and cannot be set.");
             value.SetValue(text);
-            return new InteractionOutcome("ValueProvider.SetValue", ReadBackDetail(value.Value, text));
+            return new InteractionOutcome(InteractionMethod.ValueProviderSetValue, ReadBackDetail(value.Value, text));
         }
 
         // Direct-property fallbacks for the common cases that lack a pattern.
         if (element is TextBox tb)
         {
             tb.Text = text;
-            return new InteractionOutcome("DirectProperty.Text", ReadBackDetail(tb.Text, text));
+            return new InteractionOutcome(InteractionMethod.DirectPropertyText, ReadBackDetail(tb.Text, text));
         }
         if (element is PasswordBox pb)
         {
             pb.Password = text;
             // Never echo passwords back.
-            return new InteractionOutcome("DirectProperty.Password", $"length now: {pb.Password.Length}");
+            return new InteractionOutcome(InteractionMethod.DirectPropertyPassword, $"length now: {pb.Password.Length}");
         }
 
         // Last resort: reflect for a settable string `Text` property (covers many
@@ -224,7 +224,7 @@ internal sealed class ControlInteractor
         if (prop != null && prop.CanWrite && prop.PropertyType == typeof(string))
         {
             prop.SetValue(element, text);
-            return new InteractionOutcome("Reflected.Text", ReadBackDetail(prop.GetValue(element) as string, text));
+            return new InteractionOutcome(InteractionMethod.ReflectedText, ReadBackDetail(prop.GetValue(element) as string, text));
         }
 
         throw new InvalidOperationException(
@@ -266,7 +266,7 @@ internal sealed class ControlInteractor
             NativeMethods.SendUnicodeChar(c);
         }
 
-        return new InteractionOutcome("Physical", $"typed {text.Length} char(s) after Ctrl+A/Delete");
+        return new InteractionOutcome(InteractionMethod.Physical, $"typed {text.Length} char(s) after Ctrl+A/Delete");
     }
 
     // ---------------------------------------------------------------------
@@ -301,7 +301,7 @@ internal sealed class ControlInteractor
                 throw new ArgumentOutOfRangeException(nameof(index), $"index {i} is out of range; the control has {count} item(s).");
             selector.SelectedIndex = i;
             return new InteractionOutcome(
-                "Selector.SelectedIndex",
+                InteractionMethod.SelectorSelectedIndex,
                 $"selected index {i}: '{DescribeItem(selector, i)}'");
         }
 
@@ -312,7 +312,7 @@ internal sealed class ControlInteractor
             {
                 selector.SelectedIndex = j;
                 return new InteractionOutcome(
-                    "Selector.SelectedIndex",
+                    InteractionMethod.SelectorSelectedIndex,
                     $"selected index {j}: '{text}' (matched '{itemText}')");
             }
         }
@@ -406,7 +406,7 @@ internal sealed class ControlInteractor
         foreach (var modifier in modifiers.Reverse())
             NativeMethods.KeyUp(modifier);
 
-        return new InteractionOutcome("Physical", $"sent '{keys}'");
+        return new InteractionOutcome(InteractionMethod.Physical, $"sent '{keys}'");
     }
 
     // ---------------------------------------------------------------------
@@ -422,7 +422,7 @@ internal sealed class ControlInteractor
             throw new ArgumentOutOfRangeException(nameof(index), index, "ListBox item index is out of range.");
         cancellationToken.ThrowIfCancellationRequested();
         list.ScrollIntoView(list.Items[index]);
-        return new InteractionOutcome("ListBox.ScrollIntoView", $"Issued once for item {index}; layout may still be pending.");
+        return new InteractionOutcome(InteractionMethod.ListBoxScrollIntoView, $"Issued once for item {index}; layout may still be pending.");
     }
 
     public InteractionOutcome ScrollViewer(ScrollViewer element, ScrollViewerAction action,
@@ -449,7 +449,14 @@ internal sealed class ControlInteractor
                 throw new ArgumentOutOfRangeException(nameof(action), action, "Invalid ScrollViewer action.");
         }
 
-        return new InteractionOutcome($"ScrollViewer.{action}", "Issued once on the UI dispatcher; layout may still be pending.");
+        return new InteractionOutcome(action switch
+        {
+            ScrollViewerAction.Home => InteractionMethod.ScrollViewerHome,
+            ScrollViewerAction.PageDown => InteractionMethod.ScrollViewerPageDown,
+            ScrollViewerAction.PageUp => InteractionMethod.ScrollViewerPageUp,
+            ScrollViewerAction.End => InteractionMethod.ScrollViewerEnd,
+            _ => throw new ArgumentOutOfRangeException(nameof(action), action, "Invalid ScrollViewer action.")
+        }, "Issued once on the UI dispatcher; layout may still be pending.");
     }
 
     // ---------------------------------------------------------------------

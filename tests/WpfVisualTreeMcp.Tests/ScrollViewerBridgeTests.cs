@@ -24,7 +24,7 @@ public class ScrollViewerBridgeTests
         var received = Task.Run(() => ReplyItemOnceAsync(server, request => new ScrollViewerResponse
         {
             RequestId = request.RequestId,
-            Method = "ListBox.ScrollIntoView",
+            Method = InteractionMethod.ListBoxScrollIntoView,
             ElementType = "System.Windows.Controls.ListBox",
             Detail = $"Issued once for item {request.Index}"
         }, timeout.Token));
@@ -37,7 +37,7 @@ public class ScrollViewerBridgeTests
         request.Index.Should().Be(index);
         request.Generation.Should().Be("generation-1");
         request.DeadlineUtcTicks.Should().BeInRange(before.Ticks, before.AddSeconds(11).Ticks);
-        result.Method.Should().Be("ListBox.ScrollIntoView");
+        result.Method.Should().Be(InteractionMethod.ListBoxScrollIntoView);
         result.ElementType.Should().Be("System.Windows.Controls.ListBox");
         result.Detail.Should().Be($"Issued once for item {index}");
     }
@@ -72,7 +72,7 @@ public class ScrollViewerBridgeTests
         var received = Task.Run(() => ReplyOnceAsync(server, request => new ScrollViewerResponse
         {
             RequestId = request.RequestId,
-            Method = "ScrollViewer.PageDown",
+            Method = InteractionMethod.ScrollViewerPageDown,
             ElementType = "System.Windows.Controls.ScrollViewer",
             Detail = "Issued once"
         }, timeout.Token));
@@ -85,7 +85,7 @@ public class ScrollViewerBridgeTests
         request.Action.Should().Be(ScrollViewerAction.PageDown);
         request.Generation.Should().Be("generation-1");
         request.DeadlineUtcTicks.Should().BeInRange(before.Ticks, before.AddSeconds(11).Ticks);
-        result.Method.Should().Be("ScrollViewer.PageDown");
+        result.Method.Should().Be(InteractionMethod.ScrollViewerPageDown);
         result.ElementType.Should().Be("System.Windows.Controls.ScrollViewer");
         result.Detail.Should().Be("Issued once");
     }
@@ -150,6 +150,61 @@ public class ScrollViewerBridgeTests
 
         await action.Should().ThrowAsync<OperationCanceledException>();
         server.IsConnected.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Binding_error_type_is_carried_from_inspector_to_bridge_result()
+    {
+        using var server = CreateServer();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var received = Task.Run(async () =>
+        {
+            await server.WaitForConnectionAsync(timeout.Token);
+            using var reader = new StreamReader(server, Encoding.UTF8, leaveOpen: true);
+            var envelope = IpcSerializer.DeserializeRequest((await reader.ReadLineAsync(timeout.Token))!);
+            envelope!.Value.type.Should().Be(IpcRequestType.GetBindingErrors);
+            var request = IpcSerializer.DeserializeRequestData<GetBindingErrorsRequest>(envelope.Value.data)!;
+            var response = new GetBindingErrorsResponse
+            {
+                RequestId = request.RequestId,
+                Count = 1,
+                ErrorsJson = "{\"errors\":[{\"errorType\":\"PathError\",\"message\":\"bad path\"}]}"
+            };
+            var bytes = Encoding.UTF8.GetBytes(IpcSerializer.SerializeResponse(response) + "\n");
+            await server.WriteAsync(bytes, timeout.Token);
+            await server.FlushAsync(timeout.Token);
+        });
+
+        var result = await CreateBridge().GetBindingErrorsAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        await received;
+        result.Errors.Should().ContainSingle().Which.ErrorType.Should().Be(BindingErrorType.PathError);
+    }
+
+    [Fact]
+    public async Task Unknown_binding_error_type_is_rejected()
+    {
+        using var server = CreateServer();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var received = Task.Run(async () =>
+        {
+            await server.WaitForConnectionAsync(timeout.Token);
+            using var reader = new StreamReader(server, Encoding.UTF8, leaveOpen: true);
+            var envelope = IpcSerializer.DeserializeRequest((await reader.ReadLineAsync(timeout.Token))!);
+            var request = IpcSerializer.DeserializeRequestData<GetBindingErrorsRequest>(envelope!.Value.data)!;
+            var response = new GetBindingErrorsResponse
+            {
+                RequestId = request.RequestId,
+                Count = 1,
+                ErrorsJson = "{\"errors\":[{\"errorType\":\"FutureValue\"}]}"
+            };
+            var bytes = Encoding.UTF8.GetBytes(IpcSerializer.SerializeResponse(response) + "\n");
+            await server.WriteAsync(bytes, timeout.Token);
+            await server.FlushAsync(timeout.Token);
+        });
+
+        var action = () => CreateBridge().GetBindingErrorsAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        await action.Should().ThrowAsync<System.Text.Json.JsonException>();
+        await received;
     }
 
     private static NamedPipeServerStream CreateServer() => new(

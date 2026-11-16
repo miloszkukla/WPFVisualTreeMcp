@@ -49,11 +49,11 @@ public partial class InspectionModeMatrixTests
             for (var attempt = 0; attempt < 2; attempt++)
             {
                 var home = await bridge.ScrollViewerAsync(viewer, ScrollViewerAction.Home, identity.Generation);
-                home.Method.Should().Be("ScrollViewer.Home");
+                home.Method.Should().Be(InteractionMethod.ScrollViewerHome);
                 home.ElementType.Should().Be("System.Windows.Controls.ScrollViewer");
                 await WaitForScrollOffsetAsync(bridge, viewer, identity.Generation, 0);
                 var page = await bridge.ScrollViewerAsync(viewer, ScrollViewerAction.PageDown, identity.Generation);
-                page.Method.Should().Be("ScrollViewer.PageDown");
+                page.Method.Should().Be(InteractionMethod.ScrollViewerPageDown);
                 await WaitForScrollOffsetAsync(bridge, viewer, identity.Generation, Math.Min(initial.viewport, initial.maximum));
             }
 
@@ -108,7 +108,7 @@ public partial class InspectionModeMatrixTests
         realizedBefore.Count.Should().BeLessThan(count, "the target starts outside the realized virtualized range");
 
         var outcome = await bridge.ScrollItemIntoViewAsync(list, count - 1, generation);
-        outcome.Method.Should().Be("ListBox.ScrollIntoView");
+        outcome.Method.Should().Be(InteractionMethod.ListBoxScrollIntoView);
         outcome.ElementType.Should().Be("System.Windows.Controls.ListBox");
         await WaitForScrollBoundaryAsync(bridge, viewer, generation, atEnd: true);
         var lastText = await bridge.FindElementsAsync(list, null, null, null,

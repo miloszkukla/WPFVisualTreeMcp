@@ -219,7 +219,7 @@ public class PropertyReader
         return $"\"{EscapeJson(str)}\"";
     }
 
-    private PropertyValueSource GetSourceName(BaseValueSource source)
+    internal static PropertyValueSource GetSourceName(BaseValueSource source)
     {
         return source switch
         {

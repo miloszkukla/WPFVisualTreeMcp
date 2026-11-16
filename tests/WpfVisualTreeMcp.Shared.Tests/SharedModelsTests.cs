@@ -153,7 +153,7 @@ public class SharedModelsTests
             ElementName = "StatusTextBox",
             Property = "Text",
             BindingPath = "Statsu",
-            ErrorType = "PathError",
+            ErrorType = BindingErrorType.PathError,
             Message = "BindingExpression path error: 'Statsu' property not found on 'ViewModel'"
         };
 
@@ -161,7 +161,7 @@ public class SharedModelsTests
         error.ElementName.Should().Be("StatusTextBox");
         error.Property.Should().Be("Text");
         error.BindingPath.Should().Be("Statsu");
-        error.ErrorType.Should().Be("PathError");
+        error.ErrorType.Should().Be(BindingErrorType.PathError);
         error.Message.Should().Contain("not found");
     }
 

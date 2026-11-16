@@ -10,7 +10,7 @@ public enum ScrollViewerAction
 
 public class ScrollViewerResult
 {
-    public string Method { get; set; } = string.Empty;
+    public InteractionMethod Method { get; set; }
     public string? ElementType { get; set; }
     public string? Detail { get; set; }
 }
