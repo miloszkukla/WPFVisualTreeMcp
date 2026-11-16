@@ -1,5 +1,8 @@
 using FluentAssertions;
+using ModelContextProtocol.Protocol;
+using ModelContextProtocol.Server;
 using Moq;
+using System.Text.Json;
 using WpfVisualTreeMcp.Server;
 using WpfVisualTreeMcp.Server.Services;
 using WpfVisualTreeMcp.Shared.Models;
@@ -264,6 +267,19 @@ public class WpfToolsTests
     }
 
     [Fact]
+    public async Task WpfFindElements_PassesConvertedPropertyFilter()
+    {
+        var filter = System.Text.Json.JsonSerializer.Deserialize<PropertyFilter>("{\"Number\":3,\"Active\":true,\"Empty\":null}");
+        _ipcBridgeMock.Setup(x => x.FindElementsAsync(null, "Button", null, null,
+            It.Is<Dictionary<string, string>>(values => values["Number"] == "3" && values["Active"] == "True" && values["Empty"] == ""), false, 50))
+            .ReturnsAsync(new FindElementsResult());
+
+        await _tools.WpfFindElements(type_name: "Button", property_filter: filter);
+
+        _ipcBridgeMock.VerifyAll();
+    }
+
+    [Fact]
     public async Task WpfFindElementsDeep_WithOnlyText_IsAccepted()
     {
         // Arrange
@@ -298,6 +314,7 @@ public class WpfToolsTests
 
         var result = await _tools.WpfExplainTriggers("elem_1", "Background");
 
+        result.Payload!.TemplateTriggers.Should().ContainSingle();
         var json = System.Text.Json.JsonSerializer.Serialize(result);
         json.Should().Contain("\"active\":true");
         json.Should().Contain("\"kind\":\"ActiveTrigger\"");
@@ -308,6 +325,14 @@ public class WpfToolsTests
     public async Task WpfExplainTriggers_WithEmptyHandle_Throws()
     {
         await Assert.ThrowsAsync<ArgumentException>(() => _tools.WpfExplainTriggers(""));
+    }
+
+    [Fact]
+    public async Task WpfExplainTriggers_MissingPayloadPreservesFailureShape()
+    {
+        _ipcBridgeMock.Setup(x => x.ExplainTriggersAsync("elem_1", null)).ReturnsAsync(new ExplainTriggersResult());
+        var result = await _tools.WpfExplainTriggers("elem_1");
+        System.Text.Json.JsonSerializer.Serialize(result).Should().Be("{\"success\":false}");
     }
 
     [Fact]
@@ -322,6 +347,7 @@ public class WpfToolsTests
 
         var result = await _tools.WpfEvaluateBinding("elem_1", "Text");
 
+        result.Payload!.Property.Should().Be("Text");
         var json = System.Text.Json.JsonSerializer.Serialize(result);
         json.Should().Contain("\"valueSource\":\"Local\"");
         json.Should().Contain("\"brokenAt\":\"Statsu\"");
@@ -332,6 +358,14 @@ public class WpfToolsTests
     public async Task WpfEvaluateBinding_WithEmptyHandle_Throws()
     {
         await Assert.ThrowsAsync<ArgumentException>(() => _tools.WpfEvaluateBinding("", "Text"));
+    }
+
+    [Fact]
+    public async Task WpfEvaluateBinding_MissingPayloadPreservesFailureShape()
+    {
+        _ipcBridgeMock.Setup(x => x.EvaluateBindingAsync("elem_1", "Text")).ReturnsAsync(new EvaluateBindingResult());
+        var result = await _tools.WpfEvaluateBinding("elem_1", "Text");
+        System.Text.Json.JsonSerializer.Serialize(result).Should().Be("{\"success\":false}");
     }
 
     [Fact]
@@ -363,7 +397,7 @@ public class WpfToolsTests
         var result = await _tools.WpfDiff("before", "after");
 
         // changed_count etc. surfaced; diff is the parsed document
-        result.Should().BeAssignableTo<object>();
+        result.Diff!.Changed.Should().ContainSingle();
         var json = System.Text.Json.JsonSerializer.Serialize(result);
         json.Should().Contain("\"changed_count\":1");
         json.Should().Contain("\"summary\"");
@@ -374,6 +408,56 @@ public class WpfToolsTests
     public async Task WpfDiff_WithMissingLabels_Throws()
     {
         await Assert.ThrowsAsync<ArgumentException>(() => _tools.WpfDiff("", "after"));
+    }
+
+    [Fact]
+    public async Task WpfDiff_MissingPayloadPreservesEmptyObject()
+    {
+        _ipcBridgeMock.Setup(x => x.DiffAsync("before", "after")).ReturnsAsync(new DiffResult());
+        var result = await _tools.WpfDiff("before", "after");
+        System.Text.Json.JsonSerializer.Serialize(result).Should().Be("{\"success\":true,\"changed_count\":0,\"added_count\":0,\"removed_count\":0,\"diff\":{}}");
+    }
+
+    [Fact]
+    public async Task TypedDiagnosticsEmitTheExistingMcpResultShapes()
+    {
+        _ipcBridgeMock.SetupSequence(x => x.ExplainTriggersAsync("elem_1", null))
+            .ReturnsAsync(new ExplainTriggersResult { Json = "{\"templateTriggers\":[{\"active\":true}],\"attribution\":null}" })
+            .ReturnsAsync(new ExplainTriggersResult());
+        _ipcBridgeMock.SetupSequence(x => x.EvaluateBindingAsync("elem_1", "Text"))
+            .ReturnsAsync(new EvaluateBindingResult { Json = "{\"property\":\"Text\",\"valueSource\":\"Local\",\"binding\":null}" })
+            .ReturnsAsync(new EvaluateBindingResult());
+        _ipcBridgeMock.SetupSequence(x => x.DiffAsync("before", "after"))
+            .ReturnsAsync(new DiffResult { ChangedCount = 1, Json = "{\"summary\":{\"changed\":1,\"added\":0,\"removed\":0},\"changed\":[],\"added\":[],\"removed\":[]}" })
+            .ReturnsAsync(new DiffResult());
+
+        var triggers = await InvokeMcp(nameof(WpfTools.WpfExplainTriggers), new() { ["element_handle"] = "elem_1" });
+        triggers.GetProperty("templateTriggers")[0].GetProperty("active").GetBoolean().Should().BeTrue();
+        (await InvokeMcp(nameof(WpfTools.WpfExplainTriggers), new() { ["element_handle"] = "elem_1" })).GetProperty("success").GetBoolean().Should().BeFalse();
+
+        var binding = await InvokeMcp(nameof(WpfTools.WpfEvaluateBinding), new() { ["element_handle"] = "elem_1", ["property_name"] = "Text" });
+        binding.GetProperty("valueSource").GetString().Should().Be("Local");
+        (await InvokeMcp(nameof(WpfTools.WpfEvaluateBinding), new() { ["element_handle"] = "elem_1", ["property_name"] = "Text" })).GetProperty("success").GetBoolean().Should().BeFalse();
+
+        var diff = await InvokeMcp(nameof(WpfTools.WpfDiff), new() { ["before"] = "before", ["after"] = "after" });
+        diff.GetProperty("changed_count").GetInt32().Should().Be(1);
+        diff.GetProperty("diff").GetProperty("summary").GetProperty("changed").GetInt32().Should().Be(1);
+        (await InvokeMcp(nameof(WpfTools.WpfDiff), new() { ["before"] = "before", ["after"] = "after" })).GetProperty("diff").EnumerateObject().Should().BeEmpty();
+    }
+
+    private async Task<JsonElement> InvokeMcp(string method, Dictionary<string, string> arguments)
+    {
+        var tool = McpServerTool.Create(typeof(WpfTools).GetMethod(method)!, _tools);
+        tool.ProtocolTool.OutputSchema.Should().BeNull();
+        var context = new RequestContext<CallToolRequestParams>(new Mock<McpServer>().Object, new JsonRpcRequest { Method = "tools/call" })
+        {
+            Params = new CallToolRequestParams { Name = tool.ProtocolTool.Name, Arguments = arguments.ToDictionary(x => x.Key, x => JsonSerializer.SerializeToElement(x.Value)) }
+        };
+        var result = await tool.InvokeAsync(context);
+        result.IsError.Should().NotBeTrue();
+        result.Content.Should().ContainSingle();
+        var content = result.Content[0].Should().BeOfType<TextContentBlock>().Subject;
+        return JsonSerializer.Deserialize<JsonElement>(content.Text);
     }
 
     [Fact]

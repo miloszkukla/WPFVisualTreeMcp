@@ -21,9 +21,19 @@ public static class IpcSerializer
         return JsonSerializer.Serialize(message, Options);
     }
 
+    public static void Write<T>(Utf8JsonWriter writer, T message) where T : class
+    {
+        JsonSerializer.Serialize(writer, message, Options);
+    }
+
     public static T? Deserialize<T>(string json) where T : class
     {
         return JsonSerializer.Deserialize<T>(json, Options);
+    }
+
+    public static T? Deserialize<T>(JsonElement json) where T : class
+    {
+        return json.Deserialize<T>(Options);
     }
 
     public static string SerializeRequest(IpcRequest request)

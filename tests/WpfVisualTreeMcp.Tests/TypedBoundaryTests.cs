@@ -12,12 +12,16 @@ namespace WpfVisualTreeMcp.Tests;
 public class TypedBoundaryTests
 {
     [Fact]
-    public void PropertyFilterPreservesValueTypesAndIgnoresNonObjects()
+    public void PropertyFilterConvertsValuesToTextAndIgnoresNonObjects()
     {
-        var filter = JsonSerializer.Deserialize<PropertyFilter>("{\"Number\":3,\"Active\":true,\"Text\":\"hello\"}");
-        filter!["Number"].ToString().Should().Be("3");
-        filter["Active"].ToString().Should().Be("True");
-        filter["Text"].ToString().Should().Be("hello");
+        var filter = JsonSerializer.Deserialize<PropertyFilter>("{\"Number\":3,\"Active\":true,\"Text\":\"hello\",\"Empty\":null,\"Array\":[1,2],\"Object\":{\"x\":1}}");
+        filter!["Number"].Should().Be("3");
+        filter["Active"].Should().Be("True");
+        filter["Text"].Should().Be("hello");
+        filter["Empty"].Should().Be("");
+        filter["Array"].Should().Be("[1,2]");
+        filter["Object"].Should().Be("{\"x\":1}");
+        JsonSerializer.Deserialize<PropertyFilter>(JsonSerializer.Serialize(filter)).Should().BeEquivalentTo(filter);
         JsonSerializer.Deserialize<PropertyFilter>("[1,2]").Should().BeNull();
         JsonSerializer.Deserialize<PropertyFilter>("42").Should().BeNull();
     }

@@ -54,4 +54,34 @@ public class ProjectedValueTests
 
         FluentActions.Invoking(() => captured.Value).Should().ThrowExactly<InvalidOperationException>();
     }
+
+    [Theory]
+    [InlineData("{\"missing\":\"unexpected\",\"error\":42,\"value\":7}")]
+    [InlineData("{\"missing\":{\"unexpected\":true},\"error\":[1,2],\"value\":7}")]
+    public void CaptureIgnoresInvalidMetadataWhenValueIsPresent(string field)
+    {
+        using var document = JsonDocument.Parse("{\"Count\":" + field + "}");
+        var captured = ProjectedValue<int>.Capture(document.RootElement, "Count", value => value.GetInt32());
+        captured.Value.Should().Be(7);
+    }
+
+    [Fact]
+    public void CapturedJsonValueSurvivesDisposalOfSourceDocument()
+    {
+        ProjectedValue<JsonElement> captured;
+        using (var document = JsonDocument.Parse("{\"Entry\":{\"value\":{\"name\":\"test\"}}}"))
+            captured = ProjectedValue<JsonElement>.Capture(document.RootElement, "Entry", value => value);
+        captured.Value.GetProperty("name").GetString().Should().Be("test");
+    }
+
+    [Theory]
+    [InlineData("null")]
+    [InlineData("42")]
+    [InlineData("[]")]
+    public void NonObjectFieldRemainsAnErrorOnAccess(string field)
+    {
+        using var document = JsonDocument.Parse("{\"Count\":" + field + "}");
+        var captured = ProjectedValue<int>.Capture(document.RootElement, "Count", value => value.GetInt32());
+        FluentActions.Invoking(() => captured.Value).Should().ThrowExactly<InvalidOperationException>();
+    }
 }

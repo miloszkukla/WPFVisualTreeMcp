@@ -63,11 +63,54 @@ public sealed class InspectionIdentity
 }
 
 /// <summary>A projected member and its arbitrary CLR value.</summary>
+[JsonConverter(typeof(ClrProjectedFieldConverter))]
 public sealed class ClrProjectedField
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public JsonElement Value { get; set; }
     public bool? Missing { get; set; }
     public string? Error { get; set; }
+    [JsonIgnore] public bool HasValue => Value.ValueKind != JsonValueKind.Undefined;
+}
+
+public sealed class ClrProjectedFieldConverter : JsonConverter<ClrProjectedField>
+{
+    public override ClrProjectedField Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType != JsonTokenType.StartObject) throw new JsonException("Projected field must be an object.");
+        var result = new ClrProjectedField();
+        while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
+        {
+            if (reader.TokenType != JsonTokenType.PropertyName) throw new JsonException("Expected a projected field property.");
+            var name = reader.GetString();
+            if (!reader.Read()) throw new JsonException("Missing projected field property value.");
+            switch (name)
+            {
+                case "value":
+                    using (var value = JsonDocument.ParseValue(ref reader)) result.Value = value.RootElement.Clone();
+                    break;
+                case "missing" when reader.TokenType is JsonTokenType.True or JsonTokenType.False:
+                    result.Missing = reader.GetBoolean();
+                    break;
+                case "error" when reader.TokenType == JsonTokenType.String:
+                    result.Error = reader.GetString();
+                    break;
+                default:
+                    reader.Skip();
+                    break;
+            }
+        }
+        if (reader.TokenType != JsonTokenType.EndObject) throw new JsonException("Unterminated projected field.");
+        return result;
+    }
+
+    public override void Write(Utf8JsonWriter writer, ClrProjectedField value, JsonSerializerOptions options)
+    {
+        writer.WriteStartObject();
+        if (value.HasValue) { writer.WritePropertyName("value"); value.Value.WriteTo(writer); }
+        if (value.Missing is bool missing) writer.WriteBoolean("missing", missing);
+        if (value.Error != null) writer.WriteString("error", value.Error);
+        writer.WriteEndObject();
+    }
 }
 
 /// <summary>A projected member successfully read by the inspector.</summary>
