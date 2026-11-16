@@ -221,6 +221,8 @@ public partial class InspectorService : IDisposable
         return new PrivateDependencyResolutionScope();
     }
 
+    internal static bool IsPrivateDependencyResolutionScopeActive => _privateDependencyResolutionScopeDepth.Value > 0;
+
     private sealed class PrivateDependencyResolutionScope : IDisposable
     {
         private readonly int _previousDepth;
