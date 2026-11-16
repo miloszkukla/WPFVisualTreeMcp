@@ -9,6 +9,34 @@ namespace WpfVisualTreeMcp.Tests;
 
 public class WpfControlsTests
 {
+    [Theory]
+    [InlineData("Normal", WindowState.Normal)]
+    [InlineData("Minimized", WindowState.Minimized)]
+    [InlineData("Maximized", WindowState.Maximized)]
+    public async Task WindowStateReadsTheProjectedWpfState(string projected, WindowState expected)
+    {
+        var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
+        transport.Setup(x => x.FindAsync(null, "Window", null, null, null, true, 10000)).ReturnsAsync("window");
+        transport.Setup(x => x.ReadAsync("window", "", "WindowState"))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { value = new { WindowState = new { value = projected } } }));
+        var window = await new WpfControls(transport.Object).FindAsync<Window>();
+
+        (await window.WindowStateAsync()).Should().Be(expected);
+        transport.VerifyAll();
+    }
+
+    [Fact]
+    public async Task WindowStateRejectsUnknownProjectedValues()
+    {
+        var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
+        transport.Setup(x => x.FindAsync(null, "Window", null, null, null, true, 10000)).ReturnsAsync("window");
+        transport.Setup(x => x.ReadAsync("window", "", "WindowState"))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { value = new { WindowState = new { value = "Other" } } }));
+        var window = await new WpfControls(transport.Object).FindAsync<Window>();
+
+        await FluentActions.Invoking(() => window.WindowStateAsync()).Should().ThrowAsync<InvalidOperationException>();
+    }
+
     [Fact]
     public async Task ReadValueUsesTheRequestedPathAndReportsUnreadableFields()
     {

@@ -452,7 +452,13 @@ public class Window(WpfElement element) : ContentControl(element)
 {
     public Task<bool> IsActiveAsync() => PropertyAsync<bool>("IsActive");
     public Task<string?> TitleAsync() => PropertyAsync<string>("Title");
-    public Task<string?> WindowStateAsync() => PropertyAsync<string>("WindowState");
+    public Task<WindowState> WindowStateAsync() => ReadValueAsync("", "WindowState", value => value.GetString() switch
+    {
+        "Normal" => WindowState.Normal,
+        "Minimized" => WindowState.Minimized,
+        "Maximized" => WindowState.Maximized,
+        _ => throw new InvalidOperationException($"Unknown window state: {value}")
+    });
 }
 
 [WpfType("Panel")]

@@ -27,6 +27,8 @@ public readonly record struct InspectedText(bool IsAvailable, string Text);
 
 public enum WpfTextField { Text, Header, Content }
 
+public enum WindowState { Normal, Minimized, Maximized }
+
 public enum ObservedTextKind { Undefined, Object, Array, String, Number, True, False, Null }
 
 public readonly record struct ObservedText(string? Text, ObservedTextKind Kind)
