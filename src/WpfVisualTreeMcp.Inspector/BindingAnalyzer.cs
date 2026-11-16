@@ -5,9 +5,11 @@ using System.Diagnostics;
 using System.Text;
 using System.Windows;
 using System.Windows.Data;
+using SharedBindingStatus = WpfVisualTreeMcp.Shared.Models.BindingStatus;
 using BindingErrorType = WpfVisualTreeMcp.Shared.Models.BindingErrorType;
 using BindingSourceKind = WpfVisualTreeMcp.Shared.Models.BindingSourceKind;
 using BindingRelativeSourceMode = WpfVisualTreeMcp.Shared.Models.BindingRelativeSourceMode;
+using BindingKind = WpfVisualTreeMcp.Shared.Models.BindingKind;
 
 namespace WpfVisualTreeMcp.Inspector;
 
@@ -161,7 +163,7 @@ public class BindingAnalyzer
             var multi = BindingOperations.GetMultiBindingExpression(element, dp);
             if (multi != null)
             {
-                sb.Append(",\"binding\":{\"kind\":\"MultiBinding\",\"note\":\"Use wpf_get_bindings for MultiBinding child details.\"}");
+                sb.Append($",\"binding\":{{\"kind\":\"{BindingKind.MultiBinding}\",\"note\":\"Use wpf_get_bindings for MultiBinding child details.\"}}");
             }
             else
             {
@@ -178,7 +180,7 @@ public class BindingAnalyzer
     {
         var binding = bindingExpr.ParentBinding;
         sb.Append(",\"binding\":{");
-        sb.Append("\"kind\":\"Binding\"");
+        sb.Append($"\"kind\":\"{BindingKind.Binding}\"");
 
         var path = binding.Path?.Path ?? "";
         sb.Append($",\"path\":\"{EscapeJson(path)}\"");
@@ -541,7 +543,7 @@ public class BindingAnalyzer
         sb.Append("{");
         sb.Append($"\"property\":\"{EscapeJson(bd.Property.Name)}\"");
         sb.Append($",\"path\":\"{EscapeJson(binding.Path?.Path ?? "(none)")}\"");
-        sb.Append(",\"type\":\"Binding\"");
+        sb.Append($",\"type\":\"{BindingKind.Binding}\"");
 
         // Source
         AppendBindingSource(sb, binding);
@@ -597,7 +599,7 @@ public class BindingAnalyzer
 
         sb.Append("{");
         sb.Append($"\"property\":\"{EscapeJson(bd.Property.Name)}\"");
-        sb.Append(",\"type\":\"MultiBinding\"");
+        sb.Append($",\"type\":\"{BindingKind.MultiBinding}\"");
         sb.Append($",\"mode\":\"{multi.Mode}\"");
 
         if (multi.Converter != null)
@@ -648,7 +650,7 @@ public class BindingAnalyzer
         if (binding.Source != null)
         {
             var sourceType = binding.Source.GetType();
-            sb.Append($",\"source\":\"{EscapeJson(sourceType.Name)}\"");
+            sb.Append($",\"sourceKind\":\"{BindingSourceKind.Source}\"");
             sb.Append($",\"sourceType\":\"{EscapeJson(sourceType.FullName ?? sourceType.Name)}\"");
 
             // Check if source implements INotifyPropertyChanged
@@ -657,7 +659,7 @@ public class BindingAnalyzer
         }
         else if (binding.RelativeSource != null)
         {
-            sb.Append($",\"source\":\"RelativeSource({binding.RelativeSource.Mode})\"");
+            sb.Append($",\"sourceKind\":\"{BindingSourceKind.RelativeSource}\",\"relativeSourceMode\":\"{binding.RelativeSource.Mode}\"");
             if (binding.RelativeSource.Mode == RelativeSourceMode.FindAncestor && binding.RelativeSource.AncestorType != null)
             {
                 sb.Append($",\"ancestorType\":\"{EscapeJson(binding.RelativeSource.AncestorType.Name)}\"");
@@ -667,11 +669,11 @@ public class BindingAnalyzer
         }
         else if (binding.ElementName != null)
         {
-            sb.Append($",\"source\":\"ElementName({EscapeJson(binding.ElementName)})\"");
+            sb.Append($",\"sourceKind\":\"{BindingSourceKind.ElementName}\",\"elementName\":\"{EscapeJson(binding.ElementName)}\"");
         }
         else
         {
-            sb.Append(",\"source\":\"DataContext\"");
+            sb.Append($",\"sourceKind\":\"{BindingSourceKind.DataContext}\"");
         }
     }
 
@@ -727,22 +729,22 @@ public class BindingAnalyzer
 
     #region Helpers
 
-    private string GetBindingStatus(BindingExpression expression)
+    private SharedBindingStatus GetBindingStatus(BindingExpression expression)
     {
         if (expression.HasError)
-            return "Error";
+            return SharedBindingStatus.Error;
 
         return expression.Status switch
         {
-            BindingStatus.Active => "Active",
-            BindingStatus.Inactive => "Inactive",
-            BindingStatus.Detached => "Detached",
-            BindingStatus.PathError => "PathError",
-            BindingStatus.UpdateTargetError => "UpdateTargetError",
-            BindingStatus.UpdateSourceError => "UpdateSourceError",
-            BindingStatus.AsyncRequestPending => "AsyncPending",
-            BindingStatus.Unattached => "Unattached",
-            _ => "Unknown"
+            BindingStatus.Active => SharedBindingStatus.Active,
+            BindingStatus.Inactive => SharedBindingStatus.Inactive,
+            BindingStatus.Detached => SharedBindingStatus.Detached,
+            BindingStatus.PathError => SharedBindingStatus.PathError,
+            BindingStatus.UpdateTargetError => SharedBindingStatus.UpdateTargetError,
+            BindingStatus.UpdateSourceError => SharedBindingStatus.UpdateSourceError,
+            BindingStatus.AsyncRequestPending => SharedBindingStatus.AsyncPending,
+            BindingStatus.Unattached => SharedBindingStatus.Unattached,
+            _ => SharedBindingStatus.Unknown
         };
     }
 

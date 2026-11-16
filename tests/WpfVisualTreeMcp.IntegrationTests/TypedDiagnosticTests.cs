@@ -25,6 +25,32 @@ public class TypedDiagnosticTests
     }
 
     [Fact]
+    public void Binding_listing_separates_source_kind_mode_and_element_name()
+    {
+        RunSta(() =>
+        {
+            var element = new TextBlock();
+            BindingOperations.SetBinding(element, TextBlock.TextProperty, new Binding("Name") { RelativeSource = new RelativeSource(RelativeSourceMode.Self) });
+            using var result = JsonDocument.Parse(new BindingAnalyzer().GetBindings(element));
+            var binding = result.RootElement.GetProperty("bindings").EnumerateArray().Single();
+            Assert.Equal(BindingKind.Binding, binding.GetProperty("type").Deserialize<BindingKind>());
+            Assert.Equal(BindingSourceKind.RelativeSource, binding.GetProperty("sourceKind").Deserialize<BindingSourceKind>());
+            Assert.Equal(BindingRelativeSourceMode.Self, binding.GetProperty("relativeSourceMode").Deserialize<BindingRelativeSourceMode>());
+        });
+    }
+
+    [Fact]
+    public void Invisible_click_has_a_typed_error()
+    {
+        RunSta(() =>
+        {
+            var element = new Button { Visibility = System.Windows.Visibility.Collapsed };
+            var error = Assert.Throws<InspectionException>(() => new ControlInteractor().Click(element, false));
+            Assert.Equal(InspectionErrorCode.ElementNotVisible, error.Code);
+        });
+    }
+
+    [Fact]
     public void Property_attribution_separates_kind_from_wpf_source()
     {
         RunSta(() =>

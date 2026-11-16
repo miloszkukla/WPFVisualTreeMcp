@@ -61,6 +61,19 @@ public class BindingResponseTests
         Assert.Equal(Visibility.Collapsed, layout.Layout.Visibility);
     }
 
+    [Fact]
+    public void BindingSourceIsDecodedWithoutCombiningTheElementNameAndKind()
+    {
+        var bridge = new NamedPipeBridge(NullLogger<NamedPipeBridge>.Instance, Mock.Of<IProcessManager>());
+        var parse = typeof(NamedPipeBridge).GetMethod("ParseBindingsResponse", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var response = new GetBindingsResponse { BindingsJson = "{\"bindings\":[{\"type\":\"Binding\",\"sourceKind\":\"ElementName\",\"elementName\":\"target\"}]}" };
+        var result = (BindingsResult)parse.Invoke(bridge, new object[] { response, "element" })!;
+        var binding = Assert.Single(result.Bindings);
+        Assert.Equal(BindingKind.Binding, binding.Kind);
+        Assert.Equal(BindingSourceKind.ElementName, binding.SourceKind);
+        Assert.Equal("target", binding.ElementName);
+    }
+
     [Theory]
     [InlineData("true", "True")]
     [InlineData("false", "False")]

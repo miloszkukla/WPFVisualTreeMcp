@@ -44,7 +44,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to get visual tree");
+            throw ResponseError(response, "Failed to get visual tree");
         }
 
         return ParseVisualTreeResponse(response);
@@ -64,7 +64,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to get element properties");
+            throw ResponseError(response, "Failed to get element properties");
         }
 
         return ParseElementPropertiesResponse(response, elementHandle);
@@ -91,7 +91,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to find elements");
+            throw ResponseError(response, "Failed to find elements");
         }
 
         return ParseFindElementsResponse(response);
@@ -117,7 +117,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to find elements (deep search)");
+            throw ResponseError(response, "Failed to find elements (deep search)");
         }
 
         return ParseFindElementsDeepResponse(response);
@@ -137,7 +137,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to get bindings");
+            throw ResponseError(response, "Failed to get bindings");
         }
 
         return ParseBindingsResponse(response, elementHandle);
@@ -154,7 +154,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to get binding errors");
+            throw ResponseError(response, "Failed to get binding errors");
         }
 
         return ParseBindingErrorsResponse(response);
@@ -175,7 +175,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to get resources");
+            throw ResponseError(response, "Failed to get resources");
         }
 
         return ParseResourcesResponse(response);
@@ -195,7 +195,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to get styles");
+            throw ResponseError(response, "Failed to get styles");
         }
 
         return ParseStylesResponse(response, elementHandle);
@@ -216,7 +216,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to watch property");
+            throw ResponseError(response, "Failed to watch property");
         }
 
         return response.WatchId;
@@ -237,7 +237,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to highlight element");
+            throw ResponseError(response, "Failed to highlight element");
         }
     }
 
@@ -255,7 +255,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to get layout info");
+            throw ResponseError(response, "Failed to get layout info");
         }
 
         return ParseLayoutInfoResponse(response, elementHandle);
@@ -276,7 +276,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to explain triggers");
+            throw ResponseError(response, "Failed to explain triggers");
         }
 
         return new ExplainTriggersResult { Json = response.Json };
@@ -297,7 +297,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to evaluate binding");
+            throw ResponseError(response, "Failed to evaluate binding");
         }
 
         return new EvaluateBindingResult { Json = response.EvaluationJson };
@@ -319,7 +319,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to capture snapshot");
+            throw ResponseError(response, "Failed to capture snapshot");
         }
 
         return new SnapshotResult
@@ -340,7 +340,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to diff snapshots");
+            throw ResponseError(response, "Failed to diff snapshots");
         }
 
         return new DiffResult
@@ -368,7 +368,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to set property");
+            throw ResponseError(response, "Failed to set property");
         }
 
         return new SetPropertyResult
@@ -396,7 +396,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to revert property");
+            throw ResponseError(response, "Failed to revert property");
         }
 
         return new RevertPropertyResult
@@ -429,7 +429,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to wait for element");
+            throw ResponseError(response, "Failed to wait for element");
         }
 
         return new WaitForResult
@@ -456,7 +456,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to export tree");
+            throw ResponseError(response, "Failed to export tree");
         }
 
         return new ExportResult
@@ -485,7 +485,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to capture screenshot");
+            throw ResponseError(response, "Failed to capture screenshot");
         }
 
         return new ScreenshotResult
@@ -512,7 +512,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to get DataContext");
+            throw ResponseError(response, "Failed to get DataContext");
         }
 
         return new DataContextResult
@@ -533,7 +533,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to clear binding errors");
+            throw ResponseError(response, "Failed to clear binding errors");
         }
     }
 
@@ -553,7 +553,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to click element");
+            throw ResponseError(response, "Failed to click element");
         }
 
         return new ClickResult
@@ -580,7 +580,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to select item");
+            throw ResponseError(response, "Failed to select item");
         }
 
         return new SelectItemResult
@@ -607,7 +607,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to set element text");
+            throw ResponseError(response, "Failed to set element text");
         }
 
         return new SetTextResult
@@ -633,7 +633,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
         if (!response.Success)
         {
-            throw new InvalidOperationException(response.Error ?? "Failed to send keys");
+            throw ResponseError(response, "Failed to send keys");
         }
 
         return new SendKeysResult
@@ -694,7 +694,7 @@ public partial class NamedPipeBridge : IIpcBridge
 
             if (string.IsNullOrEmpty(responseJson))
             {
-                return new TResponse { Success = false, Error = "Empty response from inspector" };
+                return new TResponse { Success = false, Error = "Empty response from inspector", ErrorCode = InspectionErrorCode.EmptyResponse };
             }
 
             var response = IpcSerializer.DeserializeResponse<TResponse>(responseJson);
@@ -722,6 +722,9 @@ public partial class NamedPipeBridge : IIpcBridge
             return new TResponse { Success = false, Error = ex.Message };
         }
     }
+
+    private static InvalidOperationException ResponseError(IpcResponse response, string fallback) => response.ErrorCode is { } code
+        ? new InspectionException(code, response.Error ?? fallback) : new InvalidOperationException(response.Error ?? fallback);
 
     private InspectionSession EnsureConnected()
     {
@@ -993,7 +996,13 @@ public partial class NamedPipeBridge : IIpcBridge
                     {
                         Property = binding.TryGetProperty("property", out var prop) ? prop.GetString() ?? "" : "",
                         Path = binding.TryGetProperty("path", out var path) ? path.GetString() ?? "" : "",
-                        Source = binding.TryGetProperty("source", out var src) ? src.GetString() ?? "" : "",
+                        Kind = binding.TryGetProperty("type", out var kind) ? kind.Deserialize<BindingKind?>() : null,
+                        SourceKind = binding.TryGetProperty("sourceKind", out var sourceKind) ? sourceKind.Deserialize<BindingSourceKind?>() : null,
+                        RelativeSourceMode = binding.TryGetProperty("relativeSourceMode", out var relativeSourceMode) ? relativeSourceMode.Deserialize<BindingRelativeSourceMode?>() : null,
+                        SourceType = binding.TryGetProperty("sourceType", out var sourceType) ? sourceType.GetString() : null,
+                        ElementName = binding.TryGetProperty("elementName", out var elementName) ? elementName.GetString() : null,
+                        AncestorType = binding.TryGetProperty("ancestorType", out var ancestorType) ? ancestorType.GetString() : null,
+                        AncestorLevel = binding.TryGetProperty("ancestorLevel", out var ancestorLevel) ? ancestorLevel.GetInt32() : null,
                         Mode = binding.TryGetProperty("mode", out var mode) ? mode.Deserialize<BindingMode?>() : null,
                         UpdateTrigger = binding.TryGetProperty("updateTrigger", out var trigger) ? trigger.Deserialize<UpdateSourceTrigger?>() : null,
                         Status = binding.TryGetProperty("status", out var status) ? status.Deserialize<BindingStatus?>() : null,

@@ -207,6 +207,24 @@ public class ScrollViewerBridgeTests
         await received;
     }
 
+    [Theory]
+    [InlineData(InspectionErrorCode.UiThreadBusy)]
+    [InlineData(InspectionErrorCode.EmptyResponse)]
+    [InlineData(InspectionErrorCode.ElementNotVisible)]
+    public async Task InspectionErrorCodesCrossThePipeWithoutDependingOnMessage(InspectionErrorCode code)
+    {
+        using var server = CreateServer();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var received = Task.Run(() => ReplyOnceAsync(server, request => new ScrollViewerResponse
+        {
+            RequestId = request.RequestId, Success = false, ErrorCode = code, Error = "changed message"
+        }, timeout.Token));
+        var error = await Assert.ThrowsAsync<InspectionException>(() => CreateBridge().ScrollViewerAsync("element", ScrollViewerAction.Home, cancellationToken: timeout.Token));
+        Assert.Equal(code, error.Code);
+        Assert.Equal("changed message", error.Message);
+        await received;
+    }
+
     private static NamedPipeServerStream CreateServer() => new(
         $"wpf_inspector_{Environment.ProcessId}", PipeDirection.InOut, 1,
         PipeTransmissionMode.Byte, PipeOptions.Asynchronous);

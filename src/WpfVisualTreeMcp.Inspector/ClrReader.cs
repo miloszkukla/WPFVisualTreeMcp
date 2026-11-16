@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Automation;
@@ -23,7 +24,7 @@ namespace WpfVisualTreeMcp.Inspector;
 public sealed class ClrReader
 {
     private static readonly Regex Segment = new(@"^([A-Za-z_]\w*)(?:\[(\d+)\])?$", RegexOptions.CultureInvariant);
-    private static readonly JsonSerializerOptions Options = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+    private static readonly JsonSerializerOptions Options = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, Converters = { new JsonStringEnumConverter(null, false) } };
 
     public string Read(object root, string path, string[] fields, int skip, int take, bool membersOnly = false)
     {
@@ -35,7 +36,7 @@ public sealed class ClrReader
             if (value == null) return JsonSerializer.Serialize(new { kind = ClrReadKind.Null, members = new object[0] }, Options);
             var members = value.GetType().GetMembers(BindingFlags.Public | BindingFlags.Instance)
                 .Where(m => m is PropertyInfo || m is FieldInfo || m is MethodInfo method && !method.IsSpecialName)
-                .Select(m => new { name = m.Name, kind = m.MemberType.ToString(), signature = m.ToString() })
+                .Select(m => new { name = m.Name, kind = m.MemberType, signature = m.ToString() })
                 .OrderBy(m => m.name, StringComparer.Ordinal).ThenBy(m => m.signature, StringComparer.Ordinal).ToArray();
             return JsonSerializer.Serialize(new { kind = ClrReadKind.Members, type = value.GetType().FullName,
                 totalCount = members.Length, skip, truncated = members.Length > skip + take, members = members.Skip(skip).Take(take).ToArray() }, Options);

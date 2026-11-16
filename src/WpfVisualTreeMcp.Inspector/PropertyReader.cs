@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Windows;
 using System.Windows.Data;
+using SharedBindingStatus = WpfVisualTreeMcp.Shared.Models.BindingStatus;
 using PropertyValueSource = WpfVisualTreeMcp.Shared.Models.PropertyValueSource;
 
 namespace WpfVisualTreeMcp.Inspector;
@@ -308,24 +309,24 @@ public class PropertyReader
         }
     }
 
-    private string GetBindingStatus(BindingExpression expression)
+    private SharedBindingStatus GetBindingStatus(BindingExpression expression)
     {
         if (expression.HasError)
         {
-            return "Error";
+            return SharedBindingStatus.Error;
         }
 
         return expression.Status switch
         {
-            BindingStatus.Active => "Active",
-            BindingStatus.Inactive => "Inactive",
-            BindingStatus.Detached => "Detached",
-            BindingStatus.PathError => "PathError",
-            BindingStatus.UpdateTargetError => "UpdateTargetError",
-            BindingStatus.UpdateSourceError => "UpdateSourceError",
-            BindingStatus.AsyncRequestPending => "AsyncPending",
-            BindingStatus.Unattached => "Unattached",
-            _ => "Unknown"
+            BindingStatus.Active => SharedBindingStatus.Active,
+            BindingStatus.Inactive => SharedBindingStatus.Inactive,
+            BindingStatus.Detached => SharedBindingStatus.Detached,
+            BindingStatus.PathError => SharedBindingStatus.PathError,
+            BindingStatus.UpdateTargetError => SharedBindingStatus.UpdateTargetError,
+            BindingStatus.UpdateSourceError => SharedBindingStatus.UpdateSourceError,
+            BindingStatus.AsyncRequestPending => SharedBindingStatus.AsyncPending,
+            BindingStatus.Unattached => SharedBindingStatus.Unattached,
+            _ => SharedBindingStatus.Unknown
         };
     }
 

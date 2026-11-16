@@ -11,7 +11,7 @@ public partial class NamedPipeBridge
     {
         var response = await SendRequestAsync<ClrReadRequest, ClrReadResponse>(EnsureConnected().ProcessId,
             new ClrReadRequest { ElementHandle = elementHandle, Path = path, Fields = fields, Skip = skip, Take = take, Generation = generation, MembersOnly = membersOnly });
-        if (!response.Success) throw new InvalidOperationException(response.Error);
+        if (!response.Success) throw ResponseError(response, "Inspector request failed");
         return response;
     }
 }

@@ -51,3 +51,7 @@ public enum PropertyAttributionKind { ValueSource, StyleSetter, ActiveTrigger, T
 public enum InteractionMethod { Unknown, Invoke, Toggle, SelectionItemSelect, ExpandCollapseExpand, ExpandCollapseCollapse, SyntheticMouse, PhysicalDoubleClick, PhysicalRightClick, Physical, ValueProviderSetValue, DirectPropertyText, DirectPropertyPassword, ReflectedText, SelectorSelectedIndex, ListBoxScrollIntoView, ScrollViewerHome, ScrollViewerPageDown, ScrollViewerPageUp, ScrollViewerEnd }
 [JsonConverter(typeof(InspectionEnumConverter))]
 public enum NotificationType { PropertyChanged, BindingError }
+[JsonConverter(typeof(InspectionEnumConverter))]
+public enum BindingKind { Binding, MultiBinding }
+[JsonConverter(typeof(InspectionEnumConverter))]
+public enum InspectionErrorCode { UiThreadBusy, EmptyResponse, ElementNotVisible }

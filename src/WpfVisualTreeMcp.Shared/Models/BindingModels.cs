@@ -7,7 +7,13 @@ public class BindingInfo
 {
     public string Property { get; set; } = string.Empty;
     public string Path { get; set; } = string.Empty;
-    public string? Source { get; set; }
+    public BindingKind? Kind { get; set; }
+    public BindingSourceKind? SourceKind { get; set; }
+    public BindingRelativeSourceMode? RelativeSourceMode { get; set; }
+    public string? SourceType { get; set; }
+    public string? ElementName { get; set; }
+    public string? AncestorType { get; set; }
+    public int? AncestorLevel { get; set; }
     public BindingMode? Mode { get; set; }
     public UpdateSourceTrigger? UpdateTrigger { get; set; }
     public BindingStatus? Status { get; set; }

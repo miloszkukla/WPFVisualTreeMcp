@@ -468,7 +468,7 @@ internal sealed class ControlInteractor
         if (!element.IsEnabled)
             throw new InvalidOperationException($"Element is disabled and cannot be {action}.");
         if (!element.IsVisible)
-            throw new InvalidOperationException($"Element is not visible and cannot be {action}.");
+            throw new InspectionException(InspectionErrorCode.ElementNotVisible, $"Element is not visible and cannot be {action}.");
     }
 
     /// <summary>

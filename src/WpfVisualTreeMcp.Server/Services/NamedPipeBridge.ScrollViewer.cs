@@ -20,7 +20,7 @@ public partial class NamedPipeBridge
         var response = await SendRequestAsync<ScrollItemIntoViewRequest, ScrollViewerResponse>(
             session.ProcessId, request, cancellationToken);
         if (!response.Success)
-            throw new InvalidOperationException(response.Error ?? "Failed to scroll item into view");
+            throw ResponseError(response, "Failed to scroll item into view");
 
         return new ScrollViewerResult
         {
@@ -45,7 +45,7 @@ public partial class NamedPipeBridge
         var response = await SendRequestAsync<ScrollViewerRequest, ScrollViewerResponse>(
             session.ProcessId, request, cancellationToken);
         if (!response.Success)
-            throw new InvalidOperationException(response.Error ?? "Failed to scroll viewer");
+            throw ResponseError(response, "Failed to scroll viewer");
 
         return new ScrollViewerResult
         {

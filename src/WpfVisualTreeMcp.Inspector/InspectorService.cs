@@ -11,6 +11,8 @@ using ScreenshotMode = WpfVisualTreeMcp.Shared.Models.ScreenshotMode;
 using WaitCondition = WpfVisualTreeMcp.Shared.Models.WaitCondition;
 using ResourceScope = WpfVisualTreeMcp.Shared.Models.ResourceScope;
 using TreeExportFormat = WpfVisualTreeMcp.Shared.Models.TreeExportFormat;
+using InspectionErrorCode = WpfVisualTreeMcp.Shared.Models.InspectionErrorCode;
+using InspectionException = WpfVisualTreeMcp.Shared.Models.InspectionException;
 
 namespace WpfVisualTreeMcp.Inspector;
 
@@ -329,7 +331,7 @@ public partial class InspectorService : IDisposable
         {
             var error = GetTimeoutErrorMessage(ex);
             DebugLog($"TIMEOUT in HandleRequestAsync: {error}");
-            return new GetVisualTreeResponse { Success = false, Error = error };
+            return new GetVisualTreeResponse { Success = false, Error = error, ErrorCode = ex is FullContentCaptureTimeoutException ? null : InspectionErrorCode.UiThreadBusy };
         }
         catch (Exception ex)
         {
@@ -1272,7 +1274,7 @@ public partial class InspectorService : IDisposable
         catch (Exception ex)
         {
             DebugLog($"ClickElement failed: {ex.Message}");
-            return new ClickElementResponse { Success = false, Error = ex.Message };
+            return new ClickElementResponse { Success = false, Error = ex.Message, ErrorCode = (ex as InspectionException)?.Code };
         }
     }
 

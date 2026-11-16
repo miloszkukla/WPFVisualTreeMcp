@@ -82,7 +82,8 @@ public class SharedModelsTests
         {
             Property = "Text",
             Path = "UserName",
-            Source = "ViewModel",
+            SourceKind = BindingSourceKind.Source,
+            SourceType = "ViewModel",
             Mode = BindingMode.TwoWay,
             UpdateTrigger = UpdateSourceTrigger.PropertyChanged,
             Status = BindingStatus.Active,
@@ -92,7 +93,8 @@ public class SharedModelsTests
         // Assert
         binding.Property.Should().Be("Text");
         binding.Path.Should().Be("UserName");
-        binding.Source.Should().Be("ViewModel");
+        binding.SourceKind.Should().Be(BindingSourceKind.Source);
+        binding.SourceType.Should().Be("ViewModel");
         binding.Mode.Should().Be(BindingMode.TwoWay);
         binding.Status.Should().Be(BindingStatus.Active);
     }

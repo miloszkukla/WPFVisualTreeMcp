@@ -73,7 +73,9 @@ public class ClrReaderTests
         var model = new Model();
         using var result = JsonDocument.Parse(new ClrReader().Read(model, "", Array.Empty<string>(), 0, 100, true));
         Assert.Equal(ClrReadKind.Members, result.RootElement.GetProperty("kind").Deserialize<ClrReadKind>());
-        Assert.Contains(result.RootElement.GetProperty("members").EnumerateArray(), item => item.GetProperty("name").GetString() == "Mutate");
+        var member = result.RootElement.GetProperty("members").EnumerateArray().Single(item => item.GetProperty("name").GetString() == "Mutate");
+        var options = new JsonSerializerOptions { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter(null, false) } };
+        Assert.Equal(System.Reflection.MemberTypes.Method, member.GetProperty("kind").Deserialize<System.Reflection.MemberTypes>(options));
         Assert.Equal(0, model.Calls);
     }
 

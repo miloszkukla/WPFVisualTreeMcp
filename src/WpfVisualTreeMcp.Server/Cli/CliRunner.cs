@@ -22,14 +22,43 @@ public static class CliRunner
         Enum.GetNames<T>().FirstOrDefault(name => string.Equals(name, value, StringComparison.OrdinalIgnoreCase)) is { } name
             ? Enum.Parse<T>(name) : throw new ArgumentException($"Invalid {typeof(T).Name}: {value}");
 
-    private static readonly string[] Commands =
+    private enum CliCommand { Unknown, List, Attach, Tree, Props, Find, FindDeep, Bindings, BindingErrors, ClearBindingErrors, DataContext, Resources, Styles, WatchProperty, Highlight, Click, SelectItem, SetText, SendKeys, WaitFor, SetProperty, RevertProperty, Snapshot, Diff, EvaluateBinding, ExplainTriggers, Layout, Export, Screenshot, Identity, Read, Members, Reacquire, Diagnostics }
+
+    private static readonly Dictionary<string, CliCommand> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "list", "attach", "tree", "props", "find", "find-deep", "bindings",
-        "binding-errors", "clear-binding-errors", "data-context", "resources",
-        "styles", "watch-property", "highlight", "click", "select-item", "set-text",
-        "send-keys", "wait-for", "set-property", "revert-property", "snapshot", "diff",
-        "evaluate-binding", "explain-triggers", "layout", "export", "screenshot",
-        "identity", "read", "members", "reacquire", "diagnostics",
+        ["list"] = CliCommand.List,
+        ["attach"] = CliCommand.Attach,
+        ["tree"] = CliCommand.Tree,
+        ["props"] = CliCommand.Props,
+        ["find"] = CliCommand.Find,
+        ["find-deep"] = CliCommand.FindDeep,
+        ["bindings"] = CliCommand.Bindings,
+        ["binding-errors"] = CliCommand.BindingErrors,
+        ["clear-binding-errors"] = CliCommand.ClearBindingErrors,
+        ["data-context"] = CliCommand.DataContext,
+        ["resources"] = CliCommand.Resources,
+        ["styles"] = CliCommand.Styles,
+        ["watch-property"] = CliCommand.WatchProperty,
+        ["highlight"] = CliCommand.Highlight,
+        ["click"] = CliCommand.Click,
+        ["select-item"] = CliCommand.SelectItem,
+        ["set-text"] = CliCommand.SetText,
+        ["send-keys"] = CliCommand.SendKeys,
+        ["wait-for"] = CliCommand.WaitFor,
+        ["set-property"] = CliCommand.SetProperty,
+        ["revert-property"] = CliCommand.RevertProperty,
+        ["snapshot"] = CliCommand.Snapshot,
+        ["diff"] = CliCommand.Diff,
+        ["evaluate-binding"] = CliCommand.EvaluateBinding,
+        ["explain-triggers"] = CliCommand.ExplainTriggers,
+        ["layout"] = CliCommand.Layout,
+        ["export"] = CliCommand.Export,
+        ["screenshot"] = CliCommand.Screenshot,
+        ["identity"] = CliCommand.Identity,
+        ["read"] = CliCommand.Read,
+        ["members"] = CliCommand.Members,
+        ["reacquire"] = CliCommand.Reacquire,
+        ["diagnostics"] = CliCommand.Diagnostics
     };
 
     /// <summary>Options that never take a value (presence alone is meaningful).</summary>
@@ -48,16 +77,17 @@ public static class CliRunner
     {
         if (string.IsNullOrEmpty(arg)) return false;
         var c = arg.TrimStart('-').ToLowerInvariant();
-        return c is "help" or "h" || Commands.Contains(c);
+        return c is "help" or "h" || Commands.ContainsKey(c);
     }
 
     /// <summary>Runs a single CLI command and returns the process exit code.</summary>
     public static async Task<int> RunAsync(string[] args)
     {
-        var command = args[0].TrimStart('-').ToLowerInvariant();
+        var commandName = args[0].TrimStart('-').ToLowerInvariant();
+        var command = Commands.TryGetValue(commandName, out var parsedCommand) ? parsedCommand : CliCommand.Unknown;
         var cli = CliArgs.Parse(args.Skip(1).ToArray(), KnownFlags);
 
-        if (command is "help" or "h")
+        if (commandName is "help" or "h")
         {
             PrintGeneralHelp();
             return 0;
@@ -82,14 +112,14 @@ public static class CliRunner
         {
             switch (command)
             {
-                case "list":
+                case CliCommand.List:
                 {
                     var processes = await processManager.GetWpfProcessesAsync();
                     WriteJson(new { processes }, cli);
                     break;
                 }
 
-                case "attach":
+                case CliCommand.Attach:
                 {
                     var session = await AttachAsync(processManager, cli, cli.Flags.Contains("auto-inject"));
                     WriteJson(new
@@ -104,26 +134,26 @@ public static class CliRunner
                     break;
                 }
 
-                case "identity":
+                case CliCommand.Identity:
                 {
                     await AttachAsync(processManager, cli, false);
                     WriteJson(await bridge.GetInspectionIdentityAsync(), cli);
                     break;
                 }
 
-                case "read":
-                case "members":
+                case CliCommand.Read:
+                case CliCommand.Members:
                 {
                     await AttachAsync(processManager, cli, false);
                     var response = await bridge.ReadClrAsync(cli.GetRequired("handle"), cli.GetStringOrNull("path") ?? "",
                         (cli.GetStringOrNull("fields") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries),
-                        cli.GetInt("skip", 0), cli.GetInt("take", 50), cli.GetStringOrNull("generation"), command == "members");
+                        cli.GetInt("skip", 0), cli.GetInt("take", 50), cli.GetStringOrNull("generation"), command == CliCommand.Members);
                     using var payload = JsonDocument.Parse(response.Json ?? "{}");
                     WriteJson(new { response.Generation, response.ProcessId, data = payload.RootElement.Clone() }, cli);
                     break;
                 }
 
-                case "reacquire":
+                case CliCommand.Reacquire:
                 {
                     await AttachAsync(processManager, cli, false);
                     var identity = await bridge.GetInspectionIdentityAsync();
@@ -133,7 +163,7 @@ public static class CliRunner
                     break;
                 }
 
-                case "diagnostics":
+                case CliCommand.Diagnostics:
                 {
                     await AttachAsync(processManager, cli, false);
                     var tools = new WpfTools(processManager, bridge);
@@ -142,7 +172,7 @@ public static class CliRunner
                     break;
                 }
 
-                case "tree":
+                case CliCommand.Tree:
                 {
                     await AttachAsync(processManager, cli, false);
                     var depth = Math.Clamp(cli.GetInt("depth", 25), 1, 100);
@@ -150,14 +180,14 @@ public static class CliRunner
                     break;
                 }
 
-                case "props":
+                case CliCommand.Props:
                 {
                     await AttachAsync(processManager, cli, false);
                     WriteJson(await bridge.GetElementPropertiesAsync(cli.GetRequired("handle")), cli);
                     break;
                 }
 
-                case "find":
+                case CliCommand.Find:
                 {
                     await AttachAsync(processManager, cli, false);
                     var result = await bridge.FindElementsAsync(
@@ -172,7 +202,7 @@ public static class CliRunner
                     break;
                 }
 
-                case "find-deep":
+                case CliCommand.FindDeep:
                 {
                     await AttachAsync(processManager, cli, false);
                     var type = cli.GetStringOrNull("type");
@@ -187,21 +217,21 @@ public static class CliRunner
                     break;
                 }
 
-                case "bindings":
+                case CliCommand.Bindings:
                 {
                     await AttachAsync(processManager, cli, false);
                     WriteJson(await bridge.GetBindingsAsync(cli.GetRequired("handle")), cli);
                     break;
                 }
 
-                case "binding-errors":
+                case CliCommand.BindingErrors:
                 {
                     await AttachAsync(processManager, cli, false);
                     WriteJson(await bridge.GetBindingErrorsAsync(), cli);
                     break;
                 }
 
-                case "clear-binding-errors":
+                case CliCommand.ClearBindingErrors:
                 {
                     await AttachAsync(processManager, cli, false);
                     await bridge.ClearBindingErrorsAsync();
@@ -209,7 +239,7 @@ public static class CliRunner
                     break;
                 }
 
-                case "data-context":
+                case CliCommand.DataContext:
                 {
                     await AttachAsync(processManager, cli, false);
                     var dc = await bridge.GetDataContextAsync(cli.GetRequired("handle"));
@@ -223,7 +253,7 @@ public static class CliRunner
                     break;
                 }
 
-                case "resources":
+                case CliCommand.Resources:
                 {
                     await AttachAsync(processManager, cli, false);
                     var scope = ParseEnum<ResourceScope>(cli.GetString("scope", "application"));
@@ -234,14 +264,14 @@ public static class CliRunner
                     break;
                 }
 
-                case "styles":
+                case CliCommand.Styles:
                 {
                     await AttachAsync(processManager, cli, false);
                     WriteJson(await bridge.GetStylesAsync(cli.GetRequired("handle")), cli);
                     break;
                 }
 
-                case "watch-property":
+                case CliCommand.WatchProperty:
                 {
                     await AttachAsync(processManager, cli, false);
                     var watchId = await bridge.WatchPropertyAsync(
@@ -255,7 +285,7 @@ public static class CliRunner
                     break;
                 }
 
-                case "highlight":
+                case CliCommand.Highlight:
                 {
                     await AttachAsync(processManager, cli, false);
                     await bridge.HighlightElementAsync(cli.GetRequired("handle"), cli.GetInt("duration", 2000));
@@ -263,7 +293,7 @@ public static class CliRunner
                     break;
                 }
 
-                case "click":
+                case CliCommand.Click:
                 {
                     await AttachAsync(processManager, cli, false);
                     var result = await bridge.ClickElementAsync(
@@ -280,7 +310,7 @@ public static class CliRunner
                     break;
                 }
 
-                case "select-item":
+                case CliCommand.SelectItem:
                 {
                     await AttachAsync(processManager, cli, false);
                     var itemText = cli.GetStringOrNull("item-text");
@@ -298,7 +328,7 @@ public static class CliRunner
                     break;
                 }
 
-                case "set-text":
+                case CliCommand.SetText:
                 {
                     await AttachAsync(processManager, cli, false);
                     var result = await bridge.SetTextAsync(
@@ -315,7 +345,7 @@ public static class CliRunner
                     break;
                 }
 
-                case "send-keys":
+                case CliCommand.SendKeys:
                 {
                     await AttachAsync(processManager, cli, false);
                     var result = await bridge.SendKeysAsync(
@@ -331,7 +361,7 @@ public static class CliRunner
                     break;
                 }
 
-                case "wait-for":
+                case CliCommand.WaitFor:
                 {
                     await AttachAsync(processManager, cli, false);
                     var type = cli.GetStringOrNull("type");
@@ -347,7 +377,7 @@ public static class CliRunner
                     break;
                 }
 
-                case "set-property":
+                case CliCommand.SetProperty:
                 {
                     await AttachAsync(processManager, cli, false);
                     var result = await bridge.SetPropertyAsync(
@@ -365,7 +395,7 @@ public static class CliRunner
                     break;
                 }
 
-                case "revert-property":
+                case CliCommand.RevertProperty:
                 {
                     await AttachAsync(processManager, cli, false);
                     var result = await bridge.RevertPropertyAsync(
@@ -383,7 +413,7 @@ public static class CliRunner
                     break;
                 }
 
-                case "evaluate-binding":
+                case CliCommand.EvaluateBinding:
                 {
                     await AttachAsync(processManager, cli, false);
                     var result = await bridge.EvaluateBindingAsync(cli.GetRequired("handle"), cli.GetRequired("property"));
@@ -391,7 +421,7 @@ public static class CliRunner
                     break;
                 }
 
-                case "explain-triggers":
+                case CliCommand.ExplainTriggers:
                 {
                     await AttachAsync(processManager, cli, false);
                     var result = await bridge.ExplainTriggersAsync(cli.GetRequired("handle"), cli.GetStringOrNull("property"));
@@ -399,7 +429,7 @@ public static class CliRunner
                     break;
                 }
 
-                case "snapshot":
+                case CliCommand.Snapshot:
                 {
                     await AttachAsync(processManager, cli, false);
                     var result = await bridge.SnapshotAsync(
@@ -410,7 +440,7 @@ public static class CliRunner
                     break;
                 }
 
-                case "diff":
+                case CliCommand.Diff:
                 {
                     await AttachAsync(processManager, cli, false);
                     var result = await bridge.DiffAsync(cli.GetRequired("before"), cli.GetRequired("after"));
@@ -422,14 +452,14 @@ public static class CliRunner
                     break;
                 }
 
-                case "layout":
+                case CliCommand.Layout:
                 {
                     await AttachAsync(processManager, cli, false);
                     WriteJson(await bridge.GetLayoutInfoAsync(cli.GetRequired("handle")), cli);
                     break;
                 }
 
-                case "export":
+                case CliCommand.Export:
                 {
                     await AttachAsync(processManager, cli, false);
                     var format = ParseEnum<TreeExportFormat>(cli.GetString("format", "json"));
@@ -457,7 +487,7 @@ public static class CliRunner
                     break;
                 }
 
-                case "screenshot":
+                case CliCommand.Screenshot:
                 {
                     await AttachAsync(processManager, cli, false);
                     var fullContent = cli.Flags.Contains("full-content");
@@ -485,7 +515,7 @@ public static class CliRunner
                 }
 
                 default:
-                    throw new ArgumentException($"Unknown command '{command}'. Run '{Exe} help' for usage.");
+                    throw new ArgumentException($"Unknown command '{commandName}'. Run '{Exe} help' for usage.");
             }
 
             return 0;
@@ -606,18 +636,18 @@ TYPICAL WORKFLOW
 ");
     }
 
-    private static void PrintCommandHelp(string command)
+    private static void PrintCommandHelp(CliCommand command)
     {
         var usage = command switch
         {
-            "list" => "list\n  List WPF processes that can be inspected. Takes no targeting options.",
-            "attach" => "attach --pid <id> | --process <name> [--auto-inject]\n"
+            CliCommand.List => "list\n  List WPF processes that can be inspected. Takes no targeting options.",
+            CliCommand.Attach => "attach --pid <id> | --process <name> [--auto-inject]\n"
                       + "  Create a session. --auto-inject loads the Inspector DLL into a process\n"
                       + "  that does not already host it (one-time; survives for later commands).",
-            "tree" => "tree --pid <id> [--root <handle>] [--depth <1-100>]\n"
+            CliCommand.Tree => "tree --pid <id> [--root <handle>] [--depth <1-100>]\n"
                     + "  Dump the visual tree. --root zooms into a subtree; --depth defaults to 25.",
-            "props" => "props --pid <id> --handle <handle>\n  List the dependency properties of an element.",
-            "find" => "find --pid <id> [--type T] [--name N] [--text S] [--visible-only] [--root H] [--max N] [--filter JSON]\n"
+            CliCommand.Props => "props --pid <id> --handle <handle>\n  List the dependency properties of an element.",
+            CliCommand.Find => "find --pid <id> [--type T] [--name N] [--text S] [--visible-only] [--root H] [--max N] [--filter JSON]\n"
                     + "  Search elements (up to --max, default 50). Filters combine with AND:\n"
                     + "  --type: type name (partial match, e.g. Button)\n"
                     + "  --text: visible text content (button caption, TextBlock text, window\n"
@@ -627,26 +657,26 @@ TYPICAL WORKFLOW
                     + "  --filter: JSON object of property=value pairs, e.g. '{\"IsEnabled\":\"True\"}'\n"
                     + "  Results include text, automationId, isVisible/isEnabled and screenBounds.\n"
                     + "  Example: find --pid 1234 --type Button --text Save --visible-only",
-            "find-deep" => "find-deep --pid <id> (--type T | --name N | --text S) [--visible-only] [--root H] [--filter JSON]\n"
+            CliCommand.FindDeep => "find-deep --pid <id> (--type T | --name N | --text S) [--visible-only] [--root H] [--filter JSON]\n"
                          + "  Unbounded search; requires --type, --name or --text. Same filters as 'find'.",
-            "bindings" => "bindings --pid <id> --handle <handle>\n  Show data bindings and their status for an element.",
-            "binding-errors" => "binding-errors --pid <id>\n  List binding errors captured since the app started.",
-            "clear-binding-errors" => "clear-binding-errors --pid <id>\n  Reset the captured binding-error list.",
-            "data-context" => "data-context --pid <id> --handle <handle>\n"
+            CliCommand.Bindings => "bindings --pid <id> --handle <handle>\n  Show data bindings and their status for an element.",
+            CliCommand.BindingErrors => "binding-errors --pid <id>\n  List binding errors captured since the app started.",
+            CliCommand.ClearBindingErrors => "clear-binding-errors --pid <id>\n  Reset the captured binding-error list.",
+            CliCommand.DataContext => "data-context --pid <id> --handle <handle>\n"
                             + "  Inspect the DataContext and its inheritance chain.",
-            "identity" => "identity --pid <id>\n  Read process identity and Inspector generation.",
-            "read" => "read --pid <id> --handle <handle> [--path <property.path>] [--fields 'Code,CodeStatus'] [--skip <n>] [--take <n>] [--generation <id>]\n  Read bounded CLR values without executing methods.",
-            "members" => "members --pid <id> --handle <handle> [--path <property.path>] [--skip <n>] [--take <n>] [--generation <id>]\n  Discover public CLR members without evaluating getters.",
-            "reacquire" => "reacquire --pid <id> [--type <type>] [--name <name>] [--text <text>]\n  Return candidates and report ambiguity.",
-            "diagnostics" => "diagnostics --pid <id> --handle <handle> [--fields 'Count,SelectedItem']\n  Collect a bounded compound diagnostic snapshot.",
-            "resources" => "resources --pid <id> [--scope application|element] [--handle <handle>]\n"
+            CliCommand.Identity => "identity --pid <id>\n  Read process identity and Inspector generation.",
+            CliCommand.Read => "read --pid <id> --handle <handle> [--path <property.path>] [--fields 'Code,CodeStatus'] [--skip <n>] [--take <n>] [--generation <id>]\n  Read bounded CLR values without executing methods.",
+            CliCommand.Members => "members --pid <id> --handle <handle> [--path <property.path>] [--skip <n>] [--take <n>] [--generation <id>]\n  Discover public CLR members without evaluating getters.",
+            CliCommand.Reacquire => "reacquire --pid <id> [--type <type>] [--name <name>] [--text <text>]\n  Return candidates and report ambiguity.",
+            CliCommand.Diagnostics => "diagnostics --pid <id> --handle <handle> [--fields 'Count,SelectedItem']\n  Collect a bounded compound diagnostic snapshot.",
+            CliCommand.Resources => "resources --pid <id> [--scope application|element] [--handle <handle>]\n"
                          + "  Enumerate resource dictionaries. --handle required when --scope is 'element'.",
-            "styles" => "styles --pid <id> --handle <handle>\n  Show applied styles and templates for an element.",
-            "watch-property" => "watch-property --pid <id> --handle <handle> --property <name>\n"
+            CliCommand.Styles => "styles --pid <id> --handle <handle>\n  Show applied styles and templates for an element.",
+            CliCommand.WatchProperty => "watch-property --pid <id> --handle <handle> --property <name>\n"
                               + "  Register a property watch in the Inspector.",
-            "highlight" => "highlight --pid <id> --handle <handle> [--duration <ms>]\n"
+            CliCommand.Highlight => "highlight --pid <id> --handle <handle> [--duration <ms>]\n"
                          + "  Flash an element in the running app. --duration defaults to 2000.",
-            "click" => "click --pid <id> --handle <handle> [--physical] [--click-type single|double|right]\n"
+            CliCommand.Click => "click --pid <id> --handle <handle> [--physical] [--click-type single|double|right]\n"
                      + "  Click an element. Default: UI Automation invoke (buttons, checkboxes,\n"
                      + "  menu items, tabs, list items, expanders) — no cursor movement.\n"
                      + "  --physical: real OS mouse click at the element (moves the cursor,\n"
@@ -654,27 +684,27 @@ TYPICAL WORKFLOW
                      + "  --click-type double/right: always physical; right opens context menus\n"
                      + "  (capture them with: screenshot --mode screen).\n"
                      + "  This command CHANGES application state.",
-            "select-item" => "select-item --pid <id> --handle <handle> (--item-text <text> | --index <n>)\n"
+            CliCommand.SelectItem => "select-item --pid <id> --handle <handle> (--item-text <text> | --index <n>)\n"
                            + "  Select an item in a ComboBox/ListBox/ListView/TabControl by visible\n"
                            + "  text (case-insensitive substring) or zero-based index. Works with\n"
                            + "  virtualized items and raises proper selection events — prefer this\n"
                            + "  over clicking dropdown items. On failure the error lists available\n"
                            + "  items. This command CHANGES application state.",
-            "set-text" => "set-text --pid <id> --handle <handle> --text <value> [--physical]\n"
+            CliCommand.SetText => "set-text --pid <id> --handle <handle> --text <value> [--physical]\n"
                         + "  Replace the text/value of an element (TextBox, ComboBox, ...).\n"
                         + "  Default: UI Automation IValueProvider.SetValue, with a\n"
                         + "  TextBox.Text / PasswordBox.Password / reflected-Text fallback.\n"
                         + "  --physical: focus the element and type via OS keyboard input\n"
                         + "  (clears existing text with Ctrl+A/Delete first, then types each\n"
                         + "  character). This command CHANGES application state.",
-            "send-keys" => "send-keys --pid <id> --keys <combo> [--handle <handle>]\n"
+            CliCommand.SendKeys => "send-keys --pid <id> --keys <combo> [--handle <handle>]\n"
                          + "  Send a keyboard shortcut to an element, or to whatever has focus\n"
                          + "  when --handle is omitted. Modifiers: Ctrl, Shift, Alt, Win.\n"
                          + "  Keys: A-Z, 0-9, F1-F12, Enter, Esc, Tab, Space, Backspace,\n"
                          + "        Delete, Insert, Home, End, PageUp, PageDown, Up/Down/Left/Right.\n"
                          + "  Examples: 'Ctrl+S', 'Ctrl+Shift+F', 'Enter', 'F5', 'Alt+F4', 'Win+R'.\n"
                          + "  This command CHANGES application state.",
-            "wait-for" => "wait-for --pid <id> (--type T | --name N | --text S) [--condition visible|exists|enabled|hidden] [--timeout <ms>] [--poll <ms>]\n"
+            CliCommand.WaitFor => "wait-for --pid <id> (--type T | --name N | --text S) [--condition visible|exists|enabled|hidden] [--timeout <ms>] [--poll <ms>]\n"
                         + "  Poll in the target app until an element matching the criteria satisfies\n"
                         + "  the condition, instead of sleep-and-retry. Conditions:\n"
                         + "    visible (default) - element exists and is on screen\n"
@@ -683,7 +713,7 @@ TYPICAL WORKFLOW
                         + "    hidden            - no matching visible element (e.g. a spinner cleared)\n"
                         + "  --timeout defaults to 10000 (max 25000); --poll defaults to 250.\n"
                         + "  Returns matched (bool), waitedMs, and matchedHandle/elementType when found.",
-            "set-property" => "set-property --pid <id> --handle <handle> --property <name> --value <value>\n"
+            CliCommand.SetProperty => "set-property --pid <id> --handle <handle> --property <name> --value <value>\n"
                             + "  Live-edit a dependency property to test a UI change without rebuilding.\n"
                             + "  The value is converted to the property's type:\n"
                             + "    --property Margin --value '20,0,20,0'   (Thickness)\n"
@@ -695,27 +725,27 @@ TYPICAL WORKFLOW
                             + "  property (Binding/Local/Unset). Setting a bound property replaces the\n"
                             + "  binding with a local value; revert-property restores it. Pair with\n"
                             + "  'screenshot' to see the effect. CHANGES app state (reversible).",
-            "revert-property" => "revert-property --pid <id> (--all | [--handle <handle>] [--property <name>])\n"
+            CliCommand.RevertProperty => "revert-property --pid <id> (--all | [--handle <handle>] [--property <name>])\n"
                                + "  Undo set-property edits. Default: revert the most recent edit.\n"
                                + "  --handle/--property target a specific one; --all reverts everything.\n"
                                + "  Restores the prior binding, local value, or default.",
-            "snapshot" => "snapshot --pid <id> [--handle <handle>] [--label <name>] [--depth <1-100>]\n"
+            CliCommand.Snapshot => "snapshot --pid <id> [--handle <handle>] [--label <name>] [--depth <1-100>]\n"
                         + "  Capture a subtree's state (layout, visibility, alignment, brushes, text)\n"
                         + "  under a label, to diff later. --handle sets the root (default: main\n"
                         + "  window). --label auto-generated if omitted. Pairs with 'diff'.",
-            "diff" => "diff --pid <id> --before <label1> --after <label2>\n"
+            CliCommand.Diff => "diff --pid <id> --before <label1> --after <label2>\n"
                     + "  Compare two snapshots and report what changed: for each changed element,\n"
                     + "  the exact properties (from → to), plus elements added/removed. Use to\n"
                     + "  measure the effect of a change:\n"
                     + "    snapshot --label before  ->  set-property ...  ->  snapshot --label after\n"
                     + "    diff --before before --after after",
-            "evaluate-binding" => "evaluate-binding --pid <id> --handle <handle> --property <name>\n"
+            CliCommand.EvaluateBinding => "evaluate-binding --pid <id> --handle <handle> --property <name>\n"
                                 + "  Explain why a property has its value. Reports the value source\n"
                                 + "  (Local/Style/Binding/Inherited/Default) and, for bindings, resolves\n"
                                 + "  the path hop-by-hop against the source, showing each segment's value\n"
                                 + "  and exactly where a broken binding fails (null intermediate, or a\n"
                                 + "  property that doesn't exist on the DataContext type).",
-            "explain-triggers" => "explain-triggers --pid <id> --handle <handle> [--property <name>]\n"
+            CliCommand.ExplainTriggers => "explain-triggers --pid <id> --handle <handle> [--property <name>]\n"
                                 + "  Evaluate the element's Style and ControlTemplate triggers against the\n"
                                 + "  current state: for each, the condition, the property's current value,\n"
                                 + "  whether it matches, whether the trigger is active, and the setters it\n"
@@ -723,8 +753,8 @@ TYPICAL WORKFLOW
                                 + "  property currently holds a different value). With --property, also\n"
                                 + "  attribute that property's value to the style setter or active trigger\n"
                                 + "  that set it (or local/inherited/default).",
-            "layout" => "layout --pid <id> --handle <handle>\n  Show layout info (sizes, margin, alignment, visibility).",
-            "screenshot" => "screenshot --pid <id> [--handle <handle>] [--out <file>] [--max-width N] [--max-height N] [--mode render|screen] [--full-content]\n"
+            CliCommand.Layout => "layout --pid <id> --handle <handle>\n  Show layout info (sizes, margin, alignment, visibility).",
+            CliCommand.Screenshot => "screenshot --pid <id> [--handle <handle>] [--out <file>] [--max-width N] [--max-height N] [--mode render|screen] [--full-content]\n"
                            + "  Capture the window (or one element) as PNG and print the file path.\n"
                            + "  --mode render (default): off-screen re-render; works when covered,\n"
                            + "  but cannot see open popups/dropdowns/context menus.\n"
@@ -734,7 +764,7 @@ TYPICAL WORKFLOW
                            + "  --full-content: with render mode, capture all content in a ScrollViewer,\n"
                            + "  including unscrolled and virtualized content; restores the scroll position.\n"
                            + "  Large full-content output is area-downscaled and memory/deadline bounded.",
-            "export" => "export --pid <id> [--handle <handle>] [--format json|xaml] [--out <file>]\n"
+            CliCommand.Export => "export --pid <id> [--handle <handle>] [--format json|xaml] [--out <file>]\n"
                       + "  Export the tree. Writes to --out if given, otherwise prints content inline.",
             _ => null,
         };

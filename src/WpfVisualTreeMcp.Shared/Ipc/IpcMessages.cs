@@ -19,6 +19,7 @@ public abstract class IpcResponse
     public string RequestId { get; set; } = string.Empty;
     public bool Success { get; set; } = true;
     public string? Error { get; set; }
+    public InspectionErrorCode? ErrorCode { get; set; }
 }
 
 // Visual Tree
