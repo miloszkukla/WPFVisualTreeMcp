@@ -250,7 +250,7 @@ public class Control(WpfElement element) : FrameworkElement(element);
 [WpfType("ContentControl")]
 public class ContentControl(WpfElement element) : Control(element)
 {
-    public async Task<string> ContentValueTextAsync() => WpfSession.Value((await ReadAsync("", "Content")).GetProperty("value"), "Content").ToString();
+    public Task<T?> ContentValueAsync<T>() => PropertyAsync<T>("Content");
     public async Task<bool> IsContentNullAsync() => WpfSession.Value((await ReadAsync("", "Content")).GetProperty("value"), "Content").ValueKind == JsonValueKind.Null;
     public async Task<string?> ContentTextAsync()
     {
@@ -267,7 +267,7 @@ public class UserControl(WpfElement element) : ContentControl(element);
 public class HeaderedContentControl(WpfElement element) : ContentControl(element)
 {
     public async Task<HeaderValue> HeaderAsync() => new(WpfSession.Value((await ReadAsync("", "Header")).GetProperty("value"), "Header"));
-    public async Task<string> HeaderObjectTextAsync() => WpfSession.Value((await ReadAsync("Header", "Text")).GetProperty("value"), "Text").ToString();
+    public async Task<string> HeaderObjectTextAsync() => await ReadValueAsync("Header", "Text", value => value.GetString() ?? "");
     public async Task<string?> HeaderTextAsync()
     {
         var member = (await ReadAsync("", "Header")).GetProperty("value").GetProperty("Header");

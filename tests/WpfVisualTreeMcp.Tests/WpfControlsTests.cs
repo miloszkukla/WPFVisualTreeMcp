@@ -9,6 +9,19 @@ namespace WpfVisualTreeMcp.Tests;
 
 public class WpfControlsTests
 {
+    [Fact]
+    public async Task LabelContentReadsANumericValueWithoutStringConversion()
+    {
+        var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
+        transport.Setup(x => x.FindAsync(null, "Label", null, null, null, true, 10000)).ReturnsAsync("label");
+        transport.Setup(x => x.ReadAsync("label", "", "Content"))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { value = new { Content = new { value = 2143 } } }));
+        var label = await new WpfControls(transport.Object).FindAsync<Label>();
+
+        (await label.ContentValueAsync<int?>()).Should().Be(2143);
+        transport.VerifyAll();
+    }
+
     [Theory]
     [InlineData("Normal", WindowState.Normal)]
     [InlineData("Minimized", WindowState.Minimized)]

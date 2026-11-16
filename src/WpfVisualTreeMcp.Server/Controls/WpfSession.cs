@@ -258,6 +258,9 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
     public Task<JsonElement> GetIdentityAsync() =>
         ObserveInspectionAsync(null, "", async () => await Bridge.GetInspectionIdentityAsync());
 
+    public Task<InspectionIdentityResponse> GetTypedIdentityAsync() =>
+        ObserveAsync(new { handle = (string?)null, path = "", fields = "" }, () => Bridge.GetInspectionIdentityAsync(), nameof(GetIdentityAsync));
+
     public Task<VisualTreeResult> GetTypedTreeAsync(string? handle = null) =>
         ObserveAsync(new { handle, path = "", fields = "" }, () => Bridge.GetVisualTreeAsync(handle, 3), nameof(GetTreeAsync));
 
@@ -270,14 +273,23 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
     public Task<JsonElement> GetPropertiesAsync(string handle) =>
         ObserveInspectionAsync(handle, "", async () => await Bridge.GetElementPropertiesAsync(handle ?? throw new ArgumentException("A handle is required.")));
 
+    public Task<ElementPropertiesResult> GetTypedPropertiesAsync(string handle) =>
+        ObserveAsync(new { handle, path = "", fields = "" }, () => Bridge.GetElementPropertiesAsync(handle ?? throw new ArgumentException("A handle is required.")), nameof(GetPropertiesAsync));
+
     public Task<JsonElement> GetBindingsAsync(string handle) =>
         ObserveInspectionAsync(handle, "", async () => await Bridge.GetBindingsAsync(handle ?? throw new ArgumentException("A handle is required.")));
 
     public Task<JsonElement> GetBindingErrorsAsync() =>
         ObserveInspectionAsync(null, "", async () => await Bridge.GetBindingErrorsAsync());
 
+    public Task<BindingErrorsResult> GetTypedBindingErrorsAsync() =>
+        ObserveAsync(new { handle = (string?)null, path = "", fields = "" }, () => Bridge.GetBindingErrorsAsync(), nameof(GetBindingErrorsAsync));
+
     public Task<JsonElement> GetLayoutAsync(string handle) =>
         ObserveInspectionAsync(handle, "", async () => await Bridge.GetLayoutInfoAsync(handle ?? throw new ArgumentException("A handle is required.")));
+
+    public Task<LayoutInfoResult> GetTypedLayoutAsync(string handle) =>
+        ObserveAsync(new { handle, path = "", fields = "" }, () => Bridge.GetLayoutInfoAsync(handle ?? throw new ArgumentException("A handle is required.")), nameof(GetLayoutAsync));
 
     public Task<JsonElement> GetMembersAsync(string? handle, string path = "") =>
         ObserveInspectionAsync(handle, path, async () => await Bridge.ReadClrAsync(handle!, path, [], 0, 50, generation, true));

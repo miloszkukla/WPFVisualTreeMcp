@@ -8,6 +8,19 @@ namespace WpfVisualTreeMcp.Tests;
 public class ProjectedValueTests
 {
     [Fact]
+    public void StringAvailabilityDoesNotHideAnInvalidConvertedValue()
+    {
+        using var document = JsonDocument.Parse("{\"Pending\":{\"missing\":true},\"WrongType\":{\"value\":1},\"Invalid\":{\"value\":\"unexpected\"}}");
+        var pending = ProjectedValue<string?>.Capture(document.RootElement, "Pending", value => value.GetString());
+        var wrongType = ProjectedValue<string?>.Capture(document.RootElement, "WrongType", value => value.GetString());
+        var invalid = ProjectedValue<int>.Capture(document.RootElement, "Invalid", _ => throw new InvalidOperationException("invalid"));
+        pending.HasStringValue.Should().BeFalse();
+        wrongType.HasStringValue.Should().BeFalse();
+        invalid.HasStringValue.Should().BeTrue();
+        FluentActions.Invoking(() => invalid.Value).Should().ThrowExactly<InvalidOperationException>().WithMessage("invalid");
+    }
+
+    [Fact]
     public void CaptureDecodesOnceAndDoesNotRetainTheDocument()
     {
         var calls = 0;

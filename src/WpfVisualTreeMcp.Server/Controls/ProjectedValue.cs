@@ -11,16 +11,21 @@ public readonly struct ProjectedValue<T>
     private readonly string? _missingField;
     private readonly string? _unreadableField;
     private readonly string? _unreadableMember;
+    private readonly bool _hasStringValue;
 
     private ProjectedValue(T? value, ExceptionDispatchInfo? error = null, string? missingField = null,
-        string? unreadableField = null, string? unreadableMember = null)
+        string? unreadableField = null, string? unreadableMember = null, bool hasStringValue = false)
     {
         _value = value;
         _error = error;
         _missingField = missingField;
         _unreadableField = unreadableField;
         _unreadableMember = unreadableMember;
+        _hasStringValue = hasStringValue;
     }
+
+    /// <summary>Whether the projection contains a string, including when decoding it fails.</summary>
+    public bool HasStringValue => _hasStringValue;
 
     public T Value
     {
@@ -42,7 +47,9 @@ public readonly struct ProjectedValue<T>
             var member = projection.GetProperty(field);
             if (!member.TryGetProperty("value", out var value))
                 return new(default, unreadableField: field, unreadableMember: member.ToString());
-            return new(convert(value));
+            var hasString = value.ValueKind == JsonValueKind.String;
+            try { return new(convert(value), hasStringValue: hasString); }
+            catch (Exception error) { return new(default, ExceptionDispatchInfo.Capture(error), hasStringValue: hasString); }
         }
         catch (Exception error)
         {
