@@ -16,7 +16,7 @@ public class IpcRequestTypeTests
         {
             observed = type;
             var request = IpcSerializer.DeserializeRequestData<ClrReadRequest>(data)!;
-            return Task.FromResult<IpcResponse>(new ClrReadResponse { Data = System.Text.Json.JsonSerializer.SerializeToElement(request.ElementHandle) });
+            return Task.FromResult<IpcResponse>(new ClrReadResponse { Data = new ClrReadEnvelope { Kind = WpfVisualTreeMcp.Shared.Models.ClrReadKind.Value, Value = System.Text.Json.JsonSerializer.SerializeToElement(request.ElementHandle) } });
         });
         server.Start();
         using var client = new NamedPipeClientStream(".", server.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous);

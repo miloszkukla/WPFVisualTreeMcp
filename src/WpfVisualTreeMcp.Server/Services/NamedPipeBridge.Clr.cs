@@ -4,7 +4,7 @@ namespace WpfVisualTreeMcp.Server.Services;
 
 public partial class NamedPipeBridge
 {
-    public Task<ClrReadResponse> GetInspectionIdentityAsync() => SendRequestAsync<InspectionIdentityRequest, ClrReadResponse>(
+    public Task<InspectionIdentityResponse> GetInspectionIdentityAsync() => SendRequestAsync<InspectionIdentityRequest, InspectionIdentityResponse>(
         EnsureConnected().ProcessId, new InspectionIdentityRequest());
 
     public async Task<ClrReadResponse> ReadClrAsync(string elementHandle, string path, string[] fields, int skip, int take, string? generation, bool membersOnly = false)

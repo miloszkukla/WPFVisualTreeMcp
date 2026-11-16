@@ -42,7 +42,7 @@ public partial class InspectionModeMatrixTests
             do
             {
                 var response = await bridge.ReadClrAsync(button, "", new[] { "$pointer" }, 0, 1, identity.Generation);
-                pointer = response.Data!.Value.GetProperty("value").GetProperty("$pointer").GetProperty("value").Clone();
+                pointer = response.Data!.Value.GetProperty("$pointer").GetProperty("value").Clone();
                 if (pointer.GetProperty("isMeasureValid").GetBoolean() && pointer.GetProperty("isArrangeValid").GetBoolean()) break;
                 await Task.Delay(50);
             }

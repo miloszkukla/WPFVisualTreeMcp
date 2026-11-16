@@ -8,7 +8,7 @@ namespace WpfVisualTreeMcp.Server.Services;
 /// </summary>
 public interface IIpcBridge
 {
-    Task<ClrReadResponse> GetInspectionIdentityAsync();
+    Task<InspectionIdentityResponse> GetInspectionIdentityAsync();
     Task<ClrReadResponse> ReadClrAsync(string elementHandle, string path, string[] fields, int skip, int take, string? generation, bool membersOnly = false);
 
     /// <summary>

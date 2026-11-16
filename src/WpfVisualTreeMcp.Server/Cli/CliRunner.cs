@@ -148,7 +148,7 @@ public static class CliRunner
                     var response = await bridge.ReadClrAsync(cli.GetRequired("handle"), cli.GetStringOrNull("path") ?? "",
                         (cli.GetStringOrNull("fields") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries),
                         cli.GetInt("skip", 0), cli.GetInt("take", 50), cli.GetStringOrNull("generation"), command == CliCommand.Members);
-                    WriteJson(new { response.Generation, response.ProcessId, data = response.Data ?? JsonSerializer.SerializeToElement(new { }) }, cli);
+                    WriteJson(new { response.Generation, response.ProcessId, data = (object?)response.Data ?? new { } }, cli);
                     break;
                 }
 

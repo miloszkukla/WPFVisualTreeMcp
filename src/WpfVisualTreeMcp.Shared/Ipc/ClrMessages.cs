@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using WpfVisualTreeMcp.Shared.Models;
 
 namespace WpfVisualTreeMcp.Shared.Ipc;
 
@@ -16,7 +18,7 @@ public class ClrReadRequest : IpcRequest
 
 public class ClrReadResponse : IpcResponse
 {
-    public JsonElement? Data { get; set; }
+    public ClrReadEnvelope? Data { get; set; }
     public string Generation { get; set; } = string.Empty;
     public int ProcessId { get; set; }
 }
@@ -24,4 +26,38 @@ public class ClrReadResponse : IpcResponse
 public class InspectionIdentityRequest : IpcRequest
 {
     public override IpcRequestType RequestType => IpcRequestType.InspectionIdentity;
+}
+
+public sealed class ClrReadEnvelope
+{
+    [JsonRequired] public ClrReadKind Kind { get; set; }
+    public string? Type { get; set; }
+    [JsonPropertyName("totalCount"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public JsonElement TotalCountValue { get; set; }
+    [JsonIgnore] public int? TotalCount => TotalCountValue.ValueKind == JsonValueKind.Number ? TotalCountValue.GetInt32() : null;
+    public int? Skip { get; set; }
+    public int? Returned { get; set; }
+    public bool? Truncated { get; set; }
+    public bool? DeadlineReached { get; set; }
+    public List<JsonElement>? Items { get; set; }
+    public List<ClrMember>? Members { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public JsonElement Value { get; set; }
+    [JsonExtensionData] public Dictionary<string, JsonElement>? AdditionalFields { get; set; }
+}
+public sealed class ClrMember
+{
+    public string? Name { get; set; }
+    [JsonConverter(typeof(JsonStringEnumConverter))] public System.Reflection.MemberTypes Kind { get; set; }
+    public string? Signature { get; set; }
+}
+public sealed class InspectionIdentityResponse : IpcResponse
+{
+    public string Generation { get; set; } = string.Empty;
+    public int ProcessId { get; set; }
+    public InspectionIdentity? Data { get; set; }
+}
+public sealed class InspectionIdentity
+{
+    public string Generation { get; set; } = string.Empty;
+    public int ProcessId { get; set; }
+    public DateTime ProcessStartUtc { get; set; }
 }

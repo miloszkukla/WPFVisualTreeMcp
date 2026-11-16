@@ -26,7 +26,7 @@ public partial class WpfTools
     }
 
     [McpServerTool, Description("Read Inspector generation and process identity before reusing temporary handles.")]
-    public Task<WpfVisualTreeMcp.Shared.Ipc.ClrReadResponse> WpfInspectionIdentity() => _ipcBridge.GetInspectionIdentityAsync();
+    public Task<WpfVisualTreeMcp.Shared.Ipc.InspectionIdentityResponse> WpfInspectionIdentity() => _ipcBridge.GetInspectionIdentityAsync();
 
     [McpServerTool, Description("Read a selected CLR property/field path. Project collections with requested fields and bounded paging; no method execution.")]
     public Task<WpfVisualTreeMcp.Shared.Ipc.ClrReadResponse> WpfReadClr(string element_handle, string path = "", string[]? fields = null,

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using WpfVisualTreeMcp.Shared.Ipc;
 
 namespace WpfVisualTreeMcp.Server.Controls;
 
@@ -18,24 +19,19 @@ public sealed record PointerState(
     [property: JsonPropertyName("captured")] PointerHit Captured,
     [property: JsonPropertyName("centerHit")] PointerHit CenterHit)
 {
-    internal static PointerState FromProjection(JsonElement value) => new(
-        PointerElement.FromProjection(value.GetProperty("target")) ?? throw new InvalidOperationException("Pointer target is null."),
-        PointerElement.FromProjection(value.GetProperty("root")),
-        value.GetProperty("windowHandle").GetInt64(),
-        PointerPoint.FromProjection(value.GetProperty("position")),
-        PointerPoint.FromProjection(value.GetProperty("center")),
-        value.GetProperty("centerInRoot").ValueKind == JsonValueKind.Null ? null : PointerPoint.FromProjection(value.GetProperty("centerInRoot")),
-        value.GetProperty("isMouseOver").GetBoolean(),
-        value.GetProperty("isMeasureValid").GetBoolean(),
-        value.GetProperty("isArrangeValid").GetBoolean(),
-        PointerHit.FromProjection(value.GetProperty("directlyOver")),
-        PointerHit.FromProjection(value.GetProperty("captured")),
-        PointerHit.FromProjection(value.GetProperty("centerHit")));
+    internal static PointerState FromProjection(JsonElement value) => FromPayload(value.Deserialize<PointerProjection>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+        ?? throw new InvalidOperationException("Pointer target is null."));
+    private static PointerState FromPayload(PointerProjection value) => new(
+        PointerElement.FromPayload(value.Target) ?? throw new InvalidOperationException("Pointer target is null."),
+        PointerElement.FromPayload(value.Root), value.WindowHandle, PointerPoint.FromPayload(value.Position), PointerPoint.FromPayload(value.Center),
+        value.CenterInRoot == null ? null : PointerPoint.FromPayload(value.CenterInRoot), value.IsMouseOver, value.IsMeasureValid,
+        value.IsArrangeValid, PointerHit.FromPayload(value.DirectlyOver), PointerHit.FromPayload(value.Captured), PointerHit.FromPayload(value.CenterHit));
+
 }
 
 public sealed record PointerPoint([property: JsonPropertyName("x")] double X, [property: JsonPropertyName("y")] double Y)
 {
-    internal static PointerPoint FromProjection(JsonElement value) => new(value.GetProperty("x").GetDouble(), value.GetProperty("y").GetDouble());
+    internal static PointerPoint FromPayload(PointerPointProjection value) => new(value.X, value.Y);
 }
 
 public sealed record PointerElement(
@@ -43,8 +39,8 @@ public sealed record PointerElement(
     [property: JsonPropertyName("name")] string? Name,
     [property: JsonPropertyName("automationId")] string? AutomationId)
 {
-    internal static PointerElement? FromProjection(JsonElement value) => value.ValueKind == JsonValueKind.Null ? null :
-        new(value.GetProperty("type").GetString(), value.GetProperty("name").GetString(), value.GetProperty("automationId").GetString());
+    internal static PointerElement? FromPayload(PointerElementProjection? value) => value == null ? null :
+        new(value.Type, value.Name, value.AutomationId);
 }
 
 public sealed record PointerHit(
@@ -53,9 +49,8 @@ public sealed record PointerHit(
     [property: JsonPropertyName("ancestors")] IReadOnlyList<PointerElement> Ancestors,
     [property: JsonPropertyName("ancestorsTruncated")] bool AncestorsTruncated)
 {
-    internal static PointerHit FromProjection(JsonElement value) => new(
-        PointerElement.FromProjection(value.GetProperty("element")),
-        value.GetProperty("targetOrDescendant").GetBoolean(),
-        value.GetProperty("ancestors").EnumerateArray().Select(item => PointerElement.FromProjection(item) ?? throw new InvalidOperationException("Pointer ancestor is null.")).ToArray(),
-        value.GetProperty("ancestorsTruncated").GetBoolean());
+    internal static PointerHit FromPayload(PointerHitProjection value) => new(
+        PointerElement.FromPayload(value.Element), value.TargetOrDescendant,
+        value.Ancestors.Select(item => PointerElement.FromPayload(item) ?? throw new InvalidOperationException("Pointer ancestor is null.")).ToArray(),
+        value.AncestorsTruncated);
 }

@@ -1,26 +1,29 @@
 using System.Text.Json;
+using WpfVisualTreeMcp.Shared.Ipc;
 
 namespace WpfVisualTreeMcp.Server.Controls;
 
 /// <summary>A rendered text layout and the physical bounds of its characters.</summary>
-public sealed class TextLayout(JsonElement projection)
+public sealed class TextLayout
 {
-    public string? Text => projection.GetProperty("text").GetString();
-    public bool IsVisible => projection.GetProperty("visible").GetBoolean();
-    public bool IsTruncated => projection.GetProperty("truncated").GetBoolean();
-    public bool DeadlineReached => projection.GetProperty("deadlineReached").GetBoolean();
-    public long WindowHandle => projection.GetProperty("windowHandle").GetInt64();
-    public IEnumerable<TextCharacter> Characters => projection.GetProperty("runs").EnumerateArray()
-        .SelectMany(run => run.GetProperty("characters").EnumerateArray().Select(character => new TextCharacter(character)));
+    private readonly TextLayoutProjection projection;
+    public TextLayout(JsonElement value) => projection = value.Deserialize<TextLayoutProjection>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+        ?? throw new InvalidOperationException("Missing text layout.");
+    public string? Text => projection.Text;
+    public bool IsVisible => projection.Visible;
+    public bool IsTruncated => projection.Truncated;
+    public bool DeadlineReached => projection.DeadlineReached;
+    public long WindowHandle => projection.WindowHandle;
+    public IEnumerable<TextCharacter> Characters => projection.Runs.SelectMany(run => run.Characters.Select(character => new TextCharacter(character)));
 }
 
-public sealed class TextCharacter(JsonElement projection)
+public sealed class TextCharacter(TextCharacterProjection projection)
 {
-    public int Offset => projection.GetProperty("offset").GetInt32();
-    public int Length => projection.GetProperty("length").GetInt32();
-    public bool IsVisible => projection.GetProperty("visible").GetBoolean();
-    public double X => projection.GetProperty("x").GetDouble();
-    public double Y => projection.GetProperty("y").GetDouble();
-    public double Width => projection.GetProperty("width").GetDouble();
-    public double Height => projection.GetProperty("height").GetDouble();
+    public int Offset => projection.Offset;
+    public int Length => projection.Length;
+    public bool IsVisible => projection.Visible;
+    public double X => projection.X;
+    public double Y => projection.Y;
+    public double Width => projection.Width;
+    public double Height => projection.Height;
 }

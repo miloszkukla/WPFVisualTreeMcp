@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
+using WpfVisualTreeMcp.Shared.Ipc;
 using System.Windows;
 using System.Windows.Data;
 using SharedBindingStatus = WpfVisualTreeMcp.Shared.Models.BindingStatus;
@@ -53,6 +55,90 @@ public class BindingAnalyzer
 
         sb.Append("]}");
         return sb.ToString();
+    }
+
+    public BindingsPayload GetTypedBindings(DependencyObject element)
+    {
+        var result = new BindingsPayload
+        {
+            Element = new InspectedElement { TypeName = element.GetType().FullName ?? element.GetType().Name,
+                Name = (element as FrameworkElement)?.Name is { Length: > 0 } name ? name : null }
+        };
+        foreach (var data in GetAllBindings(element))
+        {
+            if (data.IsMultiBinding)
+            {
+                var multi = data.MultiBinding!;
+                var expression = data.MultiExpression!;
+                var entry = new BindingPayload { Property = data.Property.Name, Type = BindingKind.MultiBinding,
+                    Mode = ParseEnum<WpfVisualTreeMcp.Shared.Models.BindingMode>(multi.Mode), Converter = multi.Converter?.GetType().Name,
+                    StringFormat = string.IsNullOrEmpty(multi.StringFormat) ? null : multi.StringFormat, ChildBindings = new(),
+                    CurrentValue = TypedValue(element.GetValue(data.Property)) };
+                if (multi.ConverterParameter != null) entry.ConverterParameter = TypedValue(multi.ConverterParameter);
+                for (var i = 0; i < multi.Bindings.Count; i++)
+                    if (multi.Bindings[i] is Binding child)
+                    {
+                        var nested = new BindingPayload { Path = child.Path?.Path ?? "(none)", Mode = ParseEnum<WpfVisualTreeMcp.Shared.Models.BindingMode>(child.Mode) };
+                        SetSource(nested, child);
+                        if (i < expression.BindingExpressions.Count && expression.BindingExpressions[i] is BindingExpression childExpression)
+                            nested.Status = GetBindingStatus(childExpression);
+                        entry.ChildBindings.Add(nested);
+                    }
+                result.Bindings.Add(entry);
+                continue;
+            }
+            var binding = data.Binding!;
+            var bindingExpression = data.Expression!;
+            var item = new BindingPayload { Property = data.Property.Name, Path = binding.Path?.Path ?? "(none)", Type = BindingKind.Binding,
+                Mode = ParseEnum<WpfVisualTreeMcp.Shared.Models.BindingMode>(binding.Mode), Status = GetBindingStatus(bindingExpression),
+                StringFormat = string.IsNullOrEmpty(binding.StringFormat) ? null : binding.StringFormat, IsAsync = binding.IsAsync ? true : null,
+                CurrentValue = TypedValue(element.GetValue(data.Property)) };
+            SetSource(item, binding);
+            if (binding.UpdateSourceTrigger != UpdateSourceTrigger.Default) item.UpdateTrigger = ParseEnum<WpfVisualTreeMcp.Shared.Models.UpdateSourceTrigger>(binding.UpdateSourceTrigger);
+            if (binding.Converter != null)
+            {
+                item.Converter = binding.Converter.GetType().Name;
+                if (binding.ConverterParameter != null) item.ConverterParameter = TypedValue(binding.ConverterParameter);
+            }
+            if (binding.FallbackValue != DependencyProperty.UnsetValue && binding.FallbackValue != null) item.FallbackValue = TypedValue(binding.FallbackValue);
+            if (binding.TargetNullValue != DependencyProperty.UnsetValue && binding.TargetNullValue != null) item.TargetNullValue = TypedValue(binding.TargetNullValue);
+            if (bindingExpression.HasError)
+            {
+                var errors = System.Windows.Controls.Validation.GetErrors(element);
+                if (errors?.Count > 0) item.ValidationError = errors[0].ErrorContent?.ToString() ?? "";
+            }
+            result.Bindings.Add(item);
+        }
+        return result;
+    }
+
+    private void SetSource(BindingPayload result, Binding binding)
+    {
+        if (binding.Source != null)
+        {
+            result.SourceKind = BindingSourceKind.Source;
+            result.SourceType = binding.Source.GetType().FullName ?? binding.Source.GetType().Name;
+            if (binding.Source is INotifyPropertyChanged) result.SourceImplementsINPC = true;
+        }
+        else if (binding.RelativeSource != null)
+        {
+            result.SourceKind = BindingSourceKind.RelativeSource;
+            result.RelativeSourceMode = ParseEnum<BindingRelativeSourceMode>(binding.RelativeSource.Mode);
+            if (binding.RelativeSource.Mode == RelativeSourceMode.FindAncestor && binding.RelativeSource.AncestorType != null)
+            {
+                result.AncestorType = binding.RelativeSource.AncestorType.Name;
+                if (binding.RelativeSource.AncestorLevel > 1) result.AncestorLevel = binding.RelativeSource.AncestorLevel;
+            }
+        }
+        else if (binding.ElementName != null) { result.SourceKind = BindingSourceKind.ElementName; result.ElementName = binding.ElementName; }
+        else result.SourceKind = BindingSourceKind.DataContext;
+    }
+
+    private static T ParseEnum<T>(object value) where T : struct => (T)Enum.Parse(typeof(T), value.ToString()!);
+    private JsonElement TypedValue(object? value)
+    {
+        using var document = JsonDocument.Parse(FormatValue(value));
+        return document.RootElement.Clone();
     }
 
     /// <summary>

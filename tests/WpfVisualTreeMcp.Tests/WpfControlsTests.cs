@@ -184,14 +184,28 @@ public class WpfControlsTests
     }
 
     [Fact]
+    public async Task BindingInfoUsesTheTypedResult()
+    {
+        var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
+        transport.Setup(x => x.FindAsync(null, "Grid", null, null, null, true, 10000)).ReturnsAsync("grid");
+        transport.Setup(x => x.GetTypedBindingsAsync("grid")).ReturnsAsync(new WpfVisualTreeMcp.Shared.Models.BindingsResult
+            { Bindings = [new() { Property = "ItemsSource", Path = "Cases" }] });
+        var grid = await new WpfControls(transport.Object).FindAsync<Grid>();
+        var binding = (await grid.BindingInfoAsync()).Should().ContainSingle().Subject;
+        binding.Property.Should().Be("ItemsSource");
+        binding.Path.Should().Be("Cases");
+        transport.VerifyAll();
+    }
+
+    [Fact]
     public async Task PropertiesAndRuntimeTypeUseDedicatedInspectionMethods()
     {
         var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
         transport.Setup(x => x.FindAsync(null, "Grid", null, null, null, true, 10000)).ReturnsAsync("grid");
         transport.Setup(x => x.GetPropertiesAsync("grid"))
             .ReturnsAsync(JsonSerializer.SerializeToElement(new { Name = "Example" }));
-        transport.Setup(x => x.GetTreeAsync("grid"))
-            .ReturnsAsync(JsonSerializer.SerializeToElement(new { Root = new { TypeName = "Example.Grid" } }));
+        transport.Setup(x => x.GetTypedTreeAsync("grid"))
+            .ReturnsAsync(new WpfVisualTreeMcp.Shared.Models.VisualTreeResult { Root = new() { TypeName = "Example.Grid" } });
         var grid = await new WpfControls(transport.Object).FindAsync<Grid>();
 
         (await grid.PropertiesAsync()).GetProperty("Name").GetString().Should().Be("Example");
@@ -615,14 +629,15 @@ public class WpfControlsTests
 
 
     [Fact]
-    public async Task BindingSearchFindsExactNestedValuesWithoutSubstringMatches()
+    public async Task BindingSearchFindsExactTypedValuesWithoutSubstringMatches()
     {
         var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
         transport.Setup(x => x.FindAsync(null, "Button", null, null, null, true, 10000)).ReturnsAsync("button");
-        transport.Setup(x => x.GetBindingsAsync("button")).ReturnsAsync(JsonSerializer.SerializeToElement(new { Bindings = new[] { new { Details = new[] { "Parent", "Exact.Path" } } } }));
+        transport.Setup(x => x.GetTypedBindingsAsync("button")).ReturnsAsync(new WpfVisualTreeMcp.Shared.Models.BindingsResult { Bindings = [new() { Path = "Exact.Path", SourceType = "Parent" }] });
         var button = await new WpfControls(transport.Object).FindAsync<Button>();
 
         (await button.BindingContainsAsync("Exact.Path")).Should().BeTrue();
+        (await button.BindingContainsAsync("Parent")).Should().BeTrue();
         (await button.BindingContainsAsync("Exact")).Should().BeFalse();
         transport.VerifyAll();
     }

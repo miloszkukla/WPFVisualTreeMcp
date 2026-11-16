@@ -16,6 +16,7 @@ using System.Windows.Interop;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
+using WpfVisualTreeMcp.Shared.Ipc;
 using ClrReadKind = WpfVisualTreeMcp.Shared.Models.ClrReadKind;
 
 namespace WpfVisualTreeMcp.Inspector;
@@ -137,7 +138,7 @@ public sealed class ClrReader
         return result;
     }
 
-    private static object Pointer(UIElement target)
+    private static PointerProjection Pointer(UIElement target)
     {
         target.Dispatcher.VerifyAccess();
         var source = PresentationSource.FromVisual(target) as HwndSource;
@@ -145,29 +146,29 @@ public sealed class ClrReader
         var position = Mouse.GetPosition(target);
         var center = new Point(target.RenderSize.Width / 2, target.RenderSize.Height / 2);
         Point? centerInRoot = root == null ? null : target.TranslatePoint(center, root);
-        return new
+        return new PointerProjection
         {
-            target = PointerElement(target),
-            root = PointerElement(root),
-            windowHandle = source?.Handle.ToInt64() ?? 0,
-            position = new { x = position.X, y = position.Y },
-            center = new { x = center.X, y = center.Y },
-            centerInRoot = centerInRoot.HasValue ? new { x = centerInRoot.Value.X, y = centerInRoot.Value.Y } : null,
-            isMouseOver = target.IsMouseOver,
-            isMeasureValid = target.IsMeasureValid,
-            isArrangeValid = target.IsArrangeValid,
-            directlyOver = PointerHit(target, Mouse.DirectlyOver),
-            captured = PointerHit(target, Mouse.Captured),
-            centerHit = PointerHit(target, centerInRoot.HasValue ? root!.InputHitTest(centerInRoot.Value) : null)
+            Target = PointerElement(target)!,
+            Root = PointerElement(root),
+            WindowHandle = source?.Handle.ToInt64() ?? 0,
+            Position = new() { X = position.X, Y = position.Y },
+            Center = new() { X = center.X, Y = center.Y },
+            CenterInRoot = centerInRoot.HasValue ? new() { X = centerInRoot.Value.X, Y = centerInRoot.Value.Y } : null,
+            IsMouseOver = target.IsMouseOver,
+            IsMeasureValid = target.IsMeasureValid,
+            IsArrangeValid = target.IsArrangeValid,
+            DirectlyOver = PointerHit(target, Mouse.DirectlyOver),
+            Captured = PointerHit(target, Mouse.Captured),
+            CenterHit = PointerHit(target, centerInRoot.HasValue ? root!.InputHitTest(centerInRoot.Value) : null)
         };
     }
 
-    private static object PointerHit(UIElement target, IInputElement? hit)
+    private static PointerHitProjection PointerHit(UIElement target, IInputElement? hit)
     {
         var current = hit as DependencyObject;
         if (hit != null && current == null)
             throw new InvalidOperationException("The WPF input hit is not a DependencyObject.");
-        var ancestors = new List<object>();
+        var ancestors = new List<PointerElementProjection>();
         var targetOrDescendant = false;
         var ancestorsTruncated = false;
         for (var depth = 0; current != null; depth++, current = PointerParent(current))
@@ -178,7 +179,7 @@ public sealed class ClrReader
             if (ancestors.Count < 10) ancestors.Add(PointerElement(current)!);
             else ancestorsTruncated = true;
         }
-        return new { element = PointerElement(hit as DependencyObject), targetOrDescendant, ancestors, ancestorsTruncated };
+        return new PointerHitProjection { Element = PointerElement(hit as DependencyObject), TargetOrDescendant = targetOrDescendant, Ancestors = ancestors, AncestorsTruncated = ancestorsTruncated };
     }
 
     private static DependencyObject? PointerParent(DependencyObject element)
@@ -189,17 +190,17 @@ public sealed class ClrReader
         return LogicalTreeHelper.GetParent(element);
     }
 
-    private static object? PointerElement(DependencyObject? element)
+    private static PointerElementProjection? PointerElement(DependencyObject? element)
     {
         if (element == null) return null;
         var name = (element as FrameworkElement)?.Name ?? (element as FrameworkContentElement)?.Name;
-        return new { type = PointerString(element.GetType().FullName), name = PointerString(name),
-            automationId = PointerString(AutomationProperties.GetAutomationId(element)) };
+        return new PointerElementProjection { Type = PointerString(element.GetType().FullName), Name = PointerString(name),
+            AutomationId = PointerString(AutomationProperties.GetAutomationId(element)) };
     }
 
     private static string? PointerString(string? text) => text != null && text.Length > 128 ? text.Substring(0, 128) : text;
 
-    private static object TextLayout(TextBlock block)
+    private static TextLayoutProjection TextLayout(TextBlock block)
     {
         var clock = Stopwatch.StartNew();
         var text = TreeWalker.GetRenderedText(block);
@@ -208,7 +209,7 @@ public sealed class ClrReader
         var visible = block.IsVisible && block.Opacity > 0 && source != null && block.ContentStart.HasValidLayout;
         var truncated = text.Length > 4096;
         var deadlineReached = false;
-        var runs = new List<object>();
+        var runs = new List<TextRunProjection>();
         var offset = 0;
         if (visible && !truncated)
         {
@@ -224,7 +225,7 @@ public sealed class ClrReader
                 var runText = position.GetTextInRun(LogicalDirection.Forward);
                 var start = text.IndexOf(runText, offset, StringComparison.Ordinal);
                 if (start < 0) throw new InvalidOperationException("The rendered inline text could not be mapped to its layout.");
-                var characters = new List<object>();
+                var characters = new List<TextCharacterProjection>();
                 for (var index = 0; index < runText.Length;)
                 {
                     if (clock.ElapsedMilliseconds > 500) { deadlineReached = true; break; }
@@ -240,17 +241,17 @@ public sealed class ClrReader
                         var top = corners.Min(point => point.Y);
                         var width = corners.Max(point => point.X) - left;
                         var height = corners.Max(point => point.Y) - top;
-                        characters.Add(new { offset = start + index, length, x = left, y = top, width, height,
-                            visible = IsTextPointVisible(block, new Point(left + width / 2, top + height / 2), viewport) });
+                        characters.Add(new TextCharacterProjection { Offset = start + index, Length = length, X = left, Y = top, Width = width, Height = height,
+                            Visible = IsTextPointVisible(block, new Point(left + width / 2, top + height / 2), viewport) });
                     }
                     index += length;
                 }
-                runs.Add(new { text = runText, offset = start, characters });
+                runs.Add(new TextRunProjection { Text = runText, Offset = start, Characters = characters });
                 offset = start + runText.Length;
                 if (deadlineReached) break;
             }
         }
-        return new { text = text.Length > 4096 ? text.Substring(0, 4096) : text, windowHandle, visible, truncated = truncated || deadlineReached, deadlineReached, runs };
+        return new TextLayoutProjection { Text = text.Length > 4096 ? text.Substring(0, 4096) : text, WindowHandle = windowHandle, Visible = visible, Truncated = truncated || deadlineReached, DeadlineReached = deadlineReached, Runs = runs };
     }
 
     private static bool IsTextPointVisible(TextBlock block, Point screen, Rect viewport)

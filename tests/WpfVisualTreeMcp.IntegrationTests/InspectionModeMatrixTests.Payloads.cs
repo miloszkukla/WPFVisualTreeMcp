@@ -37,7 +37,14 @@ public partial class InspectionModeMatrixTests
             bindings.Bindings.Should().Contain(item => item.Property == "Text" && item.Path == "UserName");
             var identity = await bridge.GetInspectionIdentityAsync();
             var read = await bridge.ReadClrAsync(handle, "", new[] { "Text" }, 0, 1, identity.Generation);
-            read.Data!.Value.GetProperty("value").GetProperty("Text").GetProperty("value").ValueKind.Should().Be(JsonValueKind.String);
+            read.Data!.Value.GetProperty("Text").GetProperty("value").ValueKind.Should().Be(JsonValueKind.String);
+            var members = await bridge.ReadClrAsync(handle, "", [], 0, 20, identity.Generation, true);
+            members.Data!.Kind.Should().Be(ClrReadKind.Members);
+            members.Data.Members.Should().NotBeEmpty();
+            var pointerRead = await bridge.ReadClrAsync(handle, "", ["$pointer"], 0, 1, identity.Generation);
+            var pointer = pointerRead.Data!.Value.GetProperty("$pointer").GetProperty("value")
+                .Deserialize<WpfVisualTreeMcp.Shared.Ipc.PointerProjection>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            pointer!.Target.Type.Should().Be("System.Windows.Controls.TextBox");
             (await bridge.GetLayoutInfoAsync(handle)).Layout.ActualWidth.Should().BeGreaterThan(0);
             (await bridge.GetBindingErrorsAsync()).Errors.Should().NotBeNull();
             (await bridge.GetResourcesAsync(ResourceScope.Application, null)).Resources.Should().NotBeNull();

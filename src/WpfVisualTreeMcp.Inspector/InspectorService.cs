@@ -580,11 +580,11 @@ public partial class InspectorService : IDisposable
             return new GetBindingsResponse { Success = false, Error = StaleHandleError(request.ElementHandle!) };
         }
 
-        var bindingsJson = _bindingAnalyzer.GetBindings(element);
+        var bindings = _bindingAnalyzer.GetTypedBindings(element);
         return new GetBindingsResponse
         {
             RequestId = request.RequestId,
-            Bindings = IpcSerializer.Deserialize<BindingsPayload>(bindingsJson)
+            Bindings = bindings
         };
     }
 
@@ -1051,11 +1051,11 @@ public partial class InspectorService : IDisposable
             return new GetLayoutInfoResponse { Success = false, Error = StaleHandleError(request.ElementHandle!) };
         }
 
-        var layoutJson = _propertyReader.GetLayoutInfo(element);
+        var layout = _propertyReader.GetTypedLayoutInfo(element);
         return new GetLayoutInfoResponse
         {
             RequestId = request.RequestId,
-            Layout = IpcSerializer.Deserialize<LayoutPayload>(layoutJson)
+            Layout = layout
         };
     }
 

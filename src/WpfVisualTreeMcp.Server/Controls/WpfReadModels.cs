@@ -17,10 +17,10 @@ public sealed class HeaderValue(JsonElement value)
     public string? TypeName => value.GetProperty("type").GetString();
 }
 
-public sealed class BindingInfo(JsonElement projection)
+public sealed class BindingInfo(WpfVisualTreeMcp.Shared.Models.BindingInfo binding)
 {
-    public string? Property => projection.GetProperty("Property").GetString();
-    public string? Path => projection.GetProperty("Path").GetString();
+    public string? Property => binding.Property;
+    public string? Path => binding.Path;
 }
 
 public readonly record struct InspectedText(bool IsAvailable, string Text);

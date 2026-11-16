@@ -28,16 +28,37 @@ public class TypedDiagnosticTests
             var element = new TextBlock { Margin = new System.Windows.Thickness(1, 2, 3, 4) };
             BindingOperations.SetBinding(element, TextBlock.TextProperty, new Binding("Name") { RelativeSource = new RelativeSource(RelativeSourceMode.Self) });
             var analyzer = new BindingAnalyzer();
-            var bindings = IpcSerializer.Deserialize<BindingsPayload>(analyzer.GetBindings(element));
+            var bindings = analyzer.GetTypedBindings(element);
             var wire = IpcSerializer.SerializeResponse(new GetBindingsResponse { Bindings = bindings });
             var roundTrip = IpcSerializer.DeserializeResponse<GetBindingsResponse>(wire)!;
             var binding = Assert.Single(roundTrip.Bindings!.Bindings, item => item.Property == "Text");
             Assert.Equal("Name", binding.Path);
             Assert.Equal(BindingSourceKind.RelativeSource, binding.SourceKind);
             Assert.Equal(BindingRelativeSourceMode.Self, binding.RelativeSourceMode);
-            var layout = IpcSerializer.Deserialize<LayoutPayload>(new PropertyReader().GetLayoutInfo(element));
+            var layout = new PropertyReader().GetTypedLayoutInfo(element);
             var layoutWire = IpcSerializer.SerializeResponse(new GetLayoutInfoResponse { Layout = layout });
             Assert.Equal(3, IpcSerializer.DeserializeResponse<GetLayoutInfoResponse>(layoutWire)!.Layout!.Layout!.Margin!.Right);
+        });
+    }
+
+    [Fact]
+    public void DirectBindingAndLayoutPayloadsMatchTheExistingStructuredContract()
+    {
+        RunSta(() =>
+        {
+            var element = new TextBlock { Margin = new System.Windows.Thickness(1, 2, 3, 4) };
+            var multi = new MultiBinding { StringFormat = "{0} {1}" };
+            multi.Bindings.Add(new Binding("Name") { RelativeSource = new RelativeSource(RelativeSourceMode.Self) });
+            multi.Bindings.Add(new Binding("Tag") { ElementName = "source" });
+            BindingOperations.SetBinding(element, TextBlock.TextProperty, multi);
+            var analyzer = new BindingAnalyzer();
+            var oldBindings = IpcSerializer.Serialize(IpcSerializer.Deserialize<BindingsPayload>(analyzer.GetBindings(element))!);
+            var newBindings = IpcSerializer.Serialize(analyzer.GetTypedBindings(element));
+            Assert.True(System.Text.Json.Nodes.JsonNode.DeepEquals(System.Text.Json.Nodes.JsonNode.Parse(oldBindings), System.Text.Json.Nodes.JsonNode.Parse(newBindings)), $"{oldBindings} != {newBindings}");
+            var reader = new PropertyReader();
+            var oldLayout = IpcSerializer.Serialize(IpcSerializer.Deserialize<LayoutPayload>(reader.GetLayoutInfo(element))!);
+            var newLayout = IpcSerializer.Serialize(reader.GetTypedLayoutInfo(element));
+            Assert.True(System.Text.Json.Nodes.JsonNode.DeepEquals(System.Text.Json.Nodes.JsonNode.Parse(oldLayout), System.Text.Json.Nodes.JsonNode.Parse(newLayout)), $"{oldLayout} != {newLayout}");
         });
     }
 

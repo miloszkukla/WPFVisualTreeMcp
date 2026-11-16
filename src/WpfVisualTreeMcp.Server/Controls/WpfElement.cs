@@ -24,6 +24,8 @@ public interface IWpfControlTransport
     Task<(string Handle, string? Name, string? Text, string? AutomationId)[]> FindAllAsync(string? type, string? name, string? text, string? root, bool visibleOnly);
     Task<JsonElement> ReadAsync(string handle, string path, string fields);
     Task<JsonElement> GetTreeAsync(string? handle = null);
+    Task<VisualTreeResult> GetTypedTreeAsync(string? handle = null);
+    Task<BindingsResult> GetTypedBindingsAsync(string handle);
     Task<JsonElement> GetPropertiesAsync(string handle);
     Task<JsonElement> GetBindingsAsync(string handle);
     Task<string> RenderedTextAsync(string handle);
@@ -143,15 +145,15 @@ public class WpfElement : IEquatable<WpfElement>
     public async Task<CollectionRead<T>> ReadCollectionAsync<T>(string path, string fields, Func<JsonElement, T> convert) =>
         new(await ReadAsync(path, fields), convert);
     public Task<JsonElement> BindingsAsync() => Owner.Transport.GetBindingsAsync(Handle);
-    public async Task<bool> BindingContainsAsync(string expected) => ContainsString(await BindingsAsync(), expected);
-
-    private static bool ContainsString(JsonElement value, string expected) => value.ValueKind switch
+    public async Task<bool> BindingContainsAsync(string expected)
     {
-        JsonValueKind.String => value.GetString() == expected,
-        JsonValueKind.Object => value.EnumerateObject().Any(member => ContainsString(member.Value, expected)),
-        JsonValueKind.Array => value.EnumerateArray().Any(item => ContainsString(item, expected)),
-        _ => false
-    };
+        var result = await Owner.Transport.GetTypedBindingsAsync(Handle);
+        if (result.Element.Handle == expected || result.Element.TypeName == expected || result.Element.Name == expected) return true;
+        return result.Bindings.Any(binding => binding.Property == expected || binding.Path == expected || binding.Kind?.ToString() == expected ||
+            binding.SourceKind?.ToString() == expected || binding.RelativeSourceMode?.ToString() == expected || binding.SourceType == expected ||
+            binding.ElementName == expected || binding.AncestorType == expected || binding.Mode?.ToString() == expected ||
+            binding.UpdateTrigger?.ToString() == expected || binding.Status?.ToString() == expected || binding.CurrentValue == expected);
+    }
 
     public async Task<InspectedText> ReadTextAsync(string path, string field)
     {
@@ -173,9 +175,9 @@ public class WpfElement : IEquatable<WpfElement>
         var value = WpfSession.Value((await ReadAsync("", name)).GetProperty("value"), name);
         return ObservedText.FromProjection(value);
     }
-    public async Task<BindingInfo[]> BindingInfoAsync() => (await BindingsAsync()).GetProperty("Bindings").EnumerateArray().Select(binding => new BindingInfo(binding)).ToArray();
+    public async Task<BindingInfo[]> BindingInfoAsync() => (await Owner.Transport.GetTypedBindingsAsync(Handle)).Bindings.Select(binding => new BindingInfo(binding)).ToArray();
     public Task<JsonElement> PropertiesAsync() => Owner.Transport.GetPropertiesAsync(Handle);
-    public async Task<string?> RuntimeTypeNameAsync() => (await Owner.Transport.GetTreeAsync(Handle)).GetProperty("Root").GetProperty("TypeName").GetString();
+    public async Task<string?> RuntimeTypeNameAsync() => (await Owner.Transport.GetTypedTreeAsync(Handle)).Root.TypeName;
     public Task SetPropertyAsync(string property, string value) => Owner.Transport.SetPropertyAsync(Handle, property, value);
 
     public async Task<T?> PropertyAsync<T>(string property)

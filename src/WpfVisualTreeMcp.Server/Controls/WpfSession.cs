@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using WpfVisualTreeMcp.Server.Controls;
 using WpfVisualTreeMcp.Server.Services;
 using WpfVisualTreeMcp.Shared.Models;
+using WpfVisualTreeMcp.Shared.Ipc;
 
 namespace WpfVisualTreeMcp.Server.Controls;
 
@@ -55,8 +56,8 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
                     throw new InvalidOperationException("The inspector generation changed; reacquire the target.");
             }
             var result = await action().WaitAsync(CancellationToken);
-            if (result?.GetType().GetProperty("Success")?.GetValue(result) is false)
-                throw new InvalidOperationException(result.GetType().GetProperty("Error")?.GetValue(result)?.ToString() ?? operation + " failed.");
+            if (result is IpcResponse { Success: false } response)
+                throw new InvalidOperationException(response.Error ?? operation + " failed.");
             await File.AppendAllTextAsync(Path.Combine(output, "commands.jsonl"), JsonSerializer.Serialize(new
             {
                 at = DateTimeOffset.UtcNow, operation, arguments, elapsedMilliseconds = timer.Elapsed.TotalMilliseconds, result
@@ -111,7 +112,9 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
     {
         var response = await ObserveAsync(new { handle, path, fields }, () =>
             Bridge.ReadClrAsync(handle, path, fields.Split(','), 0, 200, generation));
-        return response.Data?.Clone() ?? throw new InvalidOperationException("Inspector returned no CLR data.");
+        if (response.Data == null) throw new InvalidOperationException("Inspector returned no CLR data.");
+        using var projection = JsonDocument.Parse(IpcSerializer.Serialize(response.Data));
+        return projection.RootElement.Clone();
     }
 
     public static JsonElement Value(JsonElement projection, string field)
@@ -248,6 +251,12 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
 
     public Task<JsonElement> GetIdentityAsync() =>
         ObserveInspectionAsync(null, "", async () => await Bridge.GetInspectionIdentityAsync());
+
+    public Task<VisualTreeResult> GetTypedTreeAsync(string? handle = null) =>
+        ObserveAsync(new { handle, path = "", fields = "" }, () => Bridge.GetVisualTreeAsync(handle, 3), nameof(GetTreeAsync));
+
+    public Task<BindingsResult> GetTypedBindingsAsync(string handle) =>
+        ObserveAsync(new { handle, path = "", fields = "" }, () => Bridge.GetBindingsAsync(handle ?? throw new ArgumentException("A handle is required.")), nameof(GetBindingsAsync));
 
     public Task<JsonElement> GetTreeAsync(string? handle = null) =>
         ObserveInspectionAsync(handle, "", async () => await Bridge.GetVisualTreeAsync(handle, 3));

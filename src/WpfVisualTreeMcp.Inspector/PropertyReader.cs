@@ -108,6 +108,33 @@ public class PropertyReader
         return sb.ToString();
     }
 
+    public WpfVisualTreeMcp.Shared.Ipc.LayoutPayload GetTypedLayoutInfo(DependencyObject element)
+    {
+        if (element is not UIElement) return new WpfVisualTreeMcp.Shared.Ipc.LayoutPayload { Error = "Element is not a UIElement" };
+        var payload = new WpfVisualTreeMcp.Shared.Ipc.LayoutPayload
+        {
+            Element = new() { TypeName = element.GetType().FullName ?? element.GetType().Name, Name = (element as FrameworkElement)?.Name is { Length: > 0 } name ? name : null },
+            Layout = new()
+        };
+        if (element is FrameworkElement fe)
+        {
+            payload.Layout.ActualWidth = Finite(fe.ActualWidth);
+            payload.Layout.ActualHeight = Finite(fe.ActualHeight);
+            payload.Layout.DesiredSize = new() { Width = Finite(fe.DesiredSize.Width), Height = Finite(fe.DesiredSize.Height) };
+            payload.Layout.RenderSize = new() { Width = Finite(fe.RenderSize.Width), Height = Finite(fe.RenderSize.Height) };
+            payload.Layout.Margin = Thickness(fe.Margin);
+            payload.Layout.HorizontalAlignment = (WpfVisualTreeMcp.Shared.Models.HorizontalAlignment)(int)fe.HorizontalAlignment;
+            payload.Layout.VerticalAlignment = (WpfVisualTreeMcp.Shared.Models.VerticalAlignment)(int)fe.VerticalAlignment;
+            payload.Layout.Visibility = (WpfVisualTreeMcp.Shared.Models.Visibility)(int)fe.Visibility;
+            if (fe is System.Windows.Controls.Control control) payload.Layout.Padding = Thickness(control.Padding);
+        }
+        return payload;
+    }
+
+    private static double? Finite(double value) => double.IsNaN(value) || double.IsInfinity(value) ? null : value;
+    private static WpfVisualTreeMcp.Shared.Ipc.InspectedThickness Thickness(System.Windows.Thickness value) =>
+        new() { Left = Finite(value.Left), Top = Finite(value.Top), Right = Finite(value.Right), Bottom = Finite(value.Bottom) };
+
     private string GetElementInfo(DependencyObject element)
     {
         var typeName = element.GetType().FullName ?? element.GetType().Name;
