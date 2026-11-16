@@ -129,6 +129,7 @@ public class WpfElement : IEquatable<WpfElement>
     public Task WaitForStableBoundsAsync() => Owner.Transport.WaitForStableBoundsAsync(Handle);
     public Task<string> RenderedTextAsync() => Owner.Transport.RenderedTextAsync(Handle);
     public async Task<TextLayout> TextLayoutAsync() => new(WpfSession.Value((await ReadAsync("", "$textLayout")).GetProperty("value"), "$textLayout"));
+    public async Task<PointerState> PointerAsync() => PointerState.FromProjection(WpfSession.Value((await ReadAsync("", "$pointer")).GetProperty("value"), "$pointer"));
     public async Task<bool> AncestorIsEnabledAsync(int generations)
     {
         if (generations < 1) throw new ArgumentOutOfRangeException(nameof(generations));

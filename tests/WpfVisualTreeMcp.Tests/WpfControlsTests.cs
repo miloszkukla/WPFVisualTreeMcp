@@ -424,6 +424,78 @@ public class WpfControlsTests
     public sealed class CustomGrid(WpfElement element) : Control(element);
 
     [Fact]
+    public async Task PointerStatePreservesMouseHitsGeometryAndTraceShape()
+    {
+        var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
+        transport.Setup(x => x.FindAsync(null, "Button", null, null, null, true, 10000)).ReturnsAsync("button");
+        using var json = JsonDocument.Parse("""
+            {"value":{"$pointer":{"value":{
+                "target":{"type":"Button","name":"save","automationId":"save-id"},
+                "root":null,"windowHandle":123,"position":{"x":-2.5,"y":4},"center":{"x":10,"y":12},"centerInRoot":null,
+                "isMouseOver":false,"isMeasureValid":true,"isArrangeValid":false,
+                "directlyOver":{"element":{"type":"Popup","name":null,"automationId":null},"targetOrDescendant":false,
+                    "ancestors":[{"type":"Panel","name":"container","automationId":null}],"ancestorsTruncated":true},
+                "captured":{"element":null,"targetOrDescendant":false,"ancestors":[],"ancestorsTruncated":false},
+                "centerHit":{"element":{"type":"Button","name":"save","automationId":"save-id"},"targetOrDescendant":true,
+                    "ancestors":[],"ancestorsTruncated":false}
+            }}}}
+            """);
+        transport.Setup(x => x.ReadAsync("button", "", "$pointer")).ReturnsAsync(json.RootElement.Clone());
+        var button = await new WpfControls(transport.Object).FindAsync<Button>();
+
+        var pointer = await button.PointerAsync();
+        pointer.Target.Name.Should().Be("save");
+        pointer.Root.Should().BeNull();
+        pointer.WindowHandle.Should().Be(123);
+        pointer.Position.Should().Be(new PointerPoint(-2.5, 4));
+        pointer.Center.Should().Be(new PointerPoint(10, 12));
+        pointer.CenterInRoot.Should().BeNull();
+        pointer.IsMouseOver.Should().BeFalse();
+        pointer.IsMeasureValid.Should().BeTrue();
+        pointer.IsArrangeValid.Should().BeFalse();
+        pointer.DirectlyOver.Element!.Type.Should().Be("Popup");
+        pointer.DirectlyOver.Ancestors.Should().ContainSingle().Which.Name.Should().Be("container");
+        pointer.DirectlyOver.AncestorsTruncated.Should().BeTrue();
+        pointer.Captured.Element.Should().BeNull();
+        pointer.CenterHit.TargetOrDescendant.Should().BeTrue();
+        System.Text.Json.Nodes.JsonNode.DeepEquals(
+            System.Text.Json.Nodes.JsonNode.Parse(JsonSerializer.Serialize(pointer)),
+            System.Text.Json.Nodes.JsonNode.Parse(json.RootElement.GetProperty("value").GetProperty("$pointer").GetProperty("value").GetRawText())).Should().BeTrue();
+        transport.VerifyAll();
+    }
+
+    [Fact]
+    public void PointerStatePreservesRootCoordinatesAndCapture()
+    {
+        using var json = JsonDocument.Parse("""
+            {"target":{"type":"Button","name":null,"automationId":null},
+             "root":{"type":"Window","name":"main","automationId":null},"windowHandle":12,
+             "position":{"x":1,"y":2},"center":{"x":3,"y":4},"centerInRoot":{"x":5,"y":6},
+             "isMouseOver":true,"isMeasureValid":true,"isArrangeValid":true,
+             "directlyOver":{"element":null,"targetOrDescendant":false,"ancestors":[],"ancestorsTruncated":false},
+             "captured":{"element":{"type":"PopupRoot","name":null,"automationId":null},"targetOrDescendant":false,"ancestors":[],"ancestorsTruncated":false},
+             "centerHit":{"element":null,"targetOrDescendant":false,"ancestors":[],"ancestorsTruncated":false}}
+            """);
+
+        var pointer = PointerState.FromProjection(json.RootElement);
+        pointer.Root!.Name.Should().Be("main");
+        pointer.CenterInRoot.Should().Be(new PointerPoint(5, 6));
+        pointer.Captured.Element!.Type.Should().Be("PopupRoot");
+    }
+
+    [Fact]
+    public async Task PointerStatePropagatesUnreadableProjection()
+    {
+        var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
+        transport.Setup(x => x.FindAsync(null, "Button", null, null, null, true, 10000)).ReturnsAsync("button");
+        transport.Setup(x => x.ReadAsync("button", "", "$pointer"))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { value = new Dictionary<string, object> { ["$pointer"] = new { error = "unreadable" } } }));
+        var button = await new WpfControls(transport.Object).FindAsync<Button>();
+
+        await button.Invoking(x => x.PointerAsync()).Should().ThrowAsync<InvalidOperationException>().WithMessage("*unreadable*");
+    }
+
+    [Fact]
     public async Task TextLayoutPreservesCharacterGeometryAndIncompleteState()
     {
         var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
