@@ -424,6 +424,53 @@ public class WpfControlsTests
     public sealed class CustomGrid(WpfElement element) : Control(element);
 
     [Fact]
+    public async Task CollectionReadPreservesCompletenessAndDefersItemConversion()
+    {
+        var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
+        transport.Setup(x => x.FindAsync(null, "ListBox", null, null, null, true, 10000)).ReturnsAsync("list");
+        transport.SetupSequence(x => x.ReadAsync("list", "ItemsSource", "Name"))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { kind = "collection", truncated = false, deadlineReached = false, items = new[] { new { Name = new { value = "one" } } } }))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { kind = "collection", truncated = true, deadlineReached = false, items = new[] { new { Name = new { error = "unreadable" } } } }))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { kind = "collection", truncated = false, deadlineReached = true, items = Array.Empty<object>() }));
+        var list = await new WpfControls(transport.Object).FindAsync<ListBox>();
+
+        var complete = await list.ReadCollectionAsync("ItemsSource", "Name", item => WpfSession.Value(item, "Name").GetString());
+        complete.IsComplete.Should().BeTrue();
+        complete.Items.Should().Equal("one");
+        var truncated = await list.ReadCollectionAsync("ItemsSource", "Name", item => WpfSession.Value(item, "Name").GetString());
+        truncated.IsTruncated.Should().BeTrue();
+        truncated.IsComplete.Should().BeFalse();
+        var read = () => truncated.Items;
+        read.Should().Throw<InvalidOperationException>().WithMessage("*unreadable*");
+        var deadline = await list.ReadCollectionAsync("ItemsSource", "Name", item => WpfSession.Value(item, "Name").GetString());
+        deadline.DeadlineReached.Should().BeTrue();
+        deadline.IsComplete.Should().BeFalse();
+        transport.VerifyAll();
+    }
+
+    [Fact]
+    public async Task CollectionReadDistinguishesNullFromUnreadableAndNonNullObjects()
+    {
+        var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
+        transport.Setup(x => x.FindAsync(null, "ListBox", null, null, null, true, 10000)).ReturnsAsync("list");
+        transport.SetupSequence(x => x.ReadAsync("list", "DataContext.Items", "Name"))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { kind = "object", value = new { Name = new { value = (string?)null } } }))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { kind = "object", value = new { Name = new { error = "unreadable" } } }))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { kind = "object", value = new { Name = new { value = "other" } } }));
+        var list = await new WpfControls(transport.Object).FindAsync<ListBox>();
+
+        var missingCollection = await list.ReadCollectionAsync("DataContext.Items", "Name", item => item);
+        missingCollection.IsObject.Should().BeTrue();
+        missingCollection.IsComplete.Should().BeFalse();
+        missingCollection.FieldIsNull("Name").Should().BeTrue();
+        var unreadable = await list.ReadCollectionAsync("DataContext.Items", "Name", item => item);
+        unreadable.Invoking(x => x.FieldIsNull("Name")).Should().Throw<InvalidOperationException>().WithMessage("*unreadable*");
+        var nonNull = await list.ReadCollectionAsync("DataContext.Items", "Name", item => item);
+        nonNull.FieldIsNull("Name").Should().BeFalse();
+        transport.VerifyAll();
+    }
+
+    [Fact]
     public async Task PointerStatePreservesMouseHitsGeometryAndTraceShape()
     {
         var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);

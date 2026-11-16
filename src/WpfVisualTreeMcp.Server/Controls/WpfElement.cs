@@ -140,6 +140,8 @@ public class WpfElement : IEquatable<WpfElement>
     public async Task<bool> HasNoEffectAsync() => WpfSession.Value((await ReadAsync("", "Effect")).GetProperty("value"), "Effect").ValueKind == JsonValueKind.Null;
     public async Task<string?> EffectTypeNameAsync() => WpfSession.Value((await ReadAsync("", "Effect")).GetProperty("value"), "Effect").GetProperty("type").GetString();
     public Task<JsonElement> ReadAsync(string path, string fields) => Owner.Transport.ReadAsync(Handle, path, fields);
+    public async Task<CollectionRead<T>> ReadCollectionAsync<T>(string path, string fields, Func<JsonElement, T> convert) =>
+        new(await ReadAsync(path, fields), convert);
     public Task<JsonElement> BindingsAsync() => Owner.Transport.GetBindingsAsync(Handle);
     public async Task<bool> BindingContainsAsync(string expected) => ContainsString(await BindingsAsync(), expected);
 
