@@ -1,0 +1,44 @@
+using System.Text.Json;
+using FluentAssertions;
+using WpfVisualTreeMcp.Server.Controls;
+using Xunit;
+
+namespace WpfVisualTreeMcp.Tests;
+
+public class ProjectedValueTests
+{
+    [Fact]
+    public void CaptureDecodesOnceAndDoesNotRetainTheDocument()
+    {
+        var calls = 0;
+        ProjectedValue<int> captured;
+        using (var document = JsonDocument.Parse("{\"Count\":{\"value\":42}}"))
+            captured = ProjectedValue<int>.Capture(document.RootElement, "Count", value => { calls++; return value.GetInt32(); });
+
+        captured.Value.Should().Be(42);
+        captured.Value.Should().Be(42);
+        calls.Should().Be(1);
+    }
+
+    [Fact]
+    public void CapturePreservesMissingUnreadableAndNullValuesUntilAccess()
+    {
+        using var document = JsonDocument.Parse("{\"Error\":{\"error\":\"getter failed\"},\"Empty\":{\"value\":null}}");
+        var missing = ProjectedValue<string?>.Capture(document.RootElement, "Absent", value => value.GetString());
+        var unreadable = ProjectedValue<string?>.Capture(document.RootElement, "Error", value => value.GetString());
+        var empty = ProjectedValue<string?>.Capture(document.RootElement, "Empty", value => value.GetString());
+
+        FluentActions.Invoking(() => missing.Value).Should().ThrowExactly<KeyNotFoundException>();
+        FluentActions.Invoking(() => unreadable.Value).Should().ThrowExactly<InvalidOperationException>().WithMessage("*Error*getter failed*");
+        empty.Value.Should().BeNull();
+    }
+
+    [Fact]
+    public void CapturePreservesConversionFailuresUntilAccess()
+    {
+        using var document = JsonDocument.Parse("{\"Count\":{\"value\":\"not a number\"}}");
+        var captured = ProjectedValue<int>.Capture(document.RootElement, "Count", value => value.GetInt32());
+
+        FluentActions.Invoking(() => captured.Value).Should().ThrowExactly<InvalidOperationException>();
+    }
+}

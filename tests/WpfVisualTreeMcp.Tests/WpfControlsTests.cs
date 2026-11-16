@@ -10,6 +10,22 @@ namespace WpfVisualTreeMcp.Tests;
 public class WpfControlsTests
 {
     [Fact]
+    public async Task ReadValueUsesTheRequestedPathAndReportsUnreadableFields()
+    {
+        var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
+        transport.Setup(x => x.FindAsync(null, "Button", null, null, null, true, 10000)).ReturnsAsync("button");
+        transport.SetupSequence(x => x.ReadAsync("button", "Column", "DisplayIndex"))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { value = new { DisplayIndex = new { value = 3 } } }))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { value = new { DisplayIndex = new { error = "getter failed" } } }));
+        var button = await new WpfControls(transport.Object).FindAsync<Button>();
+
+        (await button.ReadValueAsync("Column", "DisplayIndex", value => value.GetInt32())).Should().Be(3);
+        await FluentActions.Invoking(() => button.ReadValueAsync("Column", "DisplayIndex", value => value.GetInt32()))
+            .Should().ThrowExactlyAsync<InvalidOperationException>().WithMessage("*DisplayIndex*getter failed*");
+        transport.VerifyAll();
+    }
+
+    [Fact]
     public async Task FindUsesTheProxyTypeAndPreservesTheScopeAndSelector()
     {
         var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);

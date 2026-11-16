@@ -184,6 +184,12 @@ public class WpfElement : IEquatable<WpfElement>
         return value.Deserialize<T>();
     }
 
+    public async Task<T> ReadValueAsync<T>(string path, string field, Func<JsonElement, T> convert)
+    {
+        var projection = await ReadAsync(path, field);
+        return ProjectedValue<T>.Capture(projection.GetProperty("value"), field, convert).Value;
+    }
+
     public bool Equals(WpfElement? other) => other != null && ReferenceEquals(Owner, other.Owner) && Handle == other.Handle;
     public override bool Equals(object? other) => other is WpfElement element && Equals(element);
     public override int GetHashCode() => HashCode.Combine(RuntimeHelpers.GetHashCode(Owner), Handle);
