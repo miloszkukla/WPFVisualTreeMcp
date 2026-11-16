@@ -42,8 +42,7 @@ public partial class InspectionModeMatrixTests
             do
             {
                 var response = await bridge.ReadClrAsync(button, "", new[] { "$pointer" }, 0, 1, identity.Generation);
-                using var document = JsonDocument.Parse(response.Json!);
-                pointer = document.RootElement.GetProperty("value").GetProperty("$pointer").GetProperty("value").Clone();
+                pointer = response.Data!.Value.GetProperty("value").GetProperty("$pointer").GetProperty("value").Clone();
                 if (pointer.GetProperty("isMeasureValid").GetBoolean() && pointer.GetProperty("isArrangeValid").GetBoolean()) break;
                 await Task.Delay(50);
             }

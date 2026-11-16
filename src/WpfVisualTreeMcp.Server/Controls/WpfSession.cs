@@ -111,8 +111,7 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
     {
         var response = await ObserveAsync(new { handle, path, fields }, () =>
             Bridge.ReadClrAsync(handle, path, fields.Split(','), 0, 200, generation));
-        using var json = JsonDocument.Parse(response.Json ?? throw new InvalidOperationException("Inspector returned no CLR data."));
-        return json.RootElement.Clone();
+        return response.Data?.Clone() ?? throw new InvalidOperationException("Inspector returned no CLR data.");
     }
 
     public static JsonElement Value(JsonElement projection, string field)

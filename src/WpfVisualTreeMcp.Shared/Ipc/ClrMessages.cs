@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace WpfVisualTreeMcp.Shared.Ipc;
 
 public class ClrReadRequest : IpcRequest
@@ -14,7 +16,7 @@ public class ClrReadRequest : IpcRequest
 
 public class ClrReadResponse : IpcResponse
 {
-    public string? Json { get; set; }
+    public JsonElement? Data { get; set; }
     public string Generation { get; set; } = string.Empty;
     public int ProcessId { get; set; }
 }

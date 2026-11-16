@@ -16,7 +16,7 @@ public class IpcRequestTypeTests
         {
             observed = type;
             var request = IpcSerializer.DeserializeRequestData<ClrReadRequest>(data)!;
-            return Task.FromResult<IpcResponse>(new ClrReadResponse { Json = request.ElementHandle });
+            return Task.FromResult<IpcResponse>(new ClrReadResponse { Data = System.Text.Json.JsonSerializer.SerializeToElement(request.ElementHandle) });
         });
         server.Start();
         using var client = new NamedPipeClientStream(".", server.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
@@ -29,7 +29,7 @@ public class IpcRequestTypeTests
 
         Assert.Equal(IpcRequestType.ReadClr, observed);
         Assert.True(result.Success, result.Error);
-        Assert.Equal("element", result.Json);
+        Assert.Equal("element", result.Data!.Value.GetString());
     }
 
     [Fact]

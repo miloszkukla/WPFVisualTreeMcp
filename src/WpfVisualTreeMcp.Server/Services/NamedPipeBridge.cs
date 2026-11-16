@@ -279,7 +279,7 @@ public partial class NamedPipeBridge : IIpcBridge
             throw ResponseError(response, "Failed to explain triggers");
         }
 
-        return new ExplainTriggersResult { Json = response.Json };
+        return new ExplainTriggersResult { Json = response.Triggers == null ? null : IpcSerializer.Serialize(response.Triggers) };
     }
 
     public async Task<EvaluateBindingResult> EvaluateBindingAsync(string elementHandle, string propertyName)
@@ -300,7 +300,7 @@ public partial class NamedPipeBridge : IIpcBridge
             throw ResponseError(response, "Failed to evaluate binding");
         }
 
-        return new EvaluateBindingResult { Json = response.EvaluationJson };
+        return new EvaluateBindingResult { Json = response.Evaluation == null ? null : IpcSerializer.Serialize(response.Evaluation) };
     }
 
     public async Task<SnapshotResult> SnapshotAsync(string? elementHandle, string? label, int maxDepth)
@@ -348,7 +348,7 @@ public partial class NamedPipeBridge : IIpcBridge
             ChangedCount = response.ChangedCount,
             AddedCount = response.AddedCount,
             RemovedCount = response.RemovedCount,
-            Json = response.DiffJson
+            Json = response.Diff == null ? null : IpcSerializer.Serialize(response.Diff)
         };
     }
 
@@ -518,7 +518,7 @@ public partial class NamedPipeBridge : IIpcBridge
         return new DataContextResult
         {
             Element = new ElementInfo { Handle = elementHandle },
-            DataContextJson = response.DataContextJson
+            DataContextJson = response.DataContext == null ? null : IpcSerializer.Serialize(response.DataContext)
         };
     }
 
@@ -740,493 +740,129 @@ public partial class NamedPipeBridge : IIpcBridge
 
     private VisualTreeResult ParseVisualTreeResponse(GetVisualTreeResponse response)
     {
-        if (string.IsNullOrEmpty(response.TreeJson))
+        return new VisualTreeResult
         {
-            return new VisualTreeResult
-            {
-                Root = new VisualTreeNode { Handle = "empty", TypeName = "Unknown" },
-                TotalElements = 0,
-                MaxDepthReached = false
-            };
-        }
-
-        try
-        {
-            using var doc = JsonDocument.Parse(response.TreeJson);
-            var root = doc.RootElement;
-
-            var rootNode = ParseVisualTreeNode(root.GetProperty("root"));
-
-            return new VisualTreeResult
-            {
-                Root = rootNode,
-                TotalElements = response.TotalElements,
-                MaxDepthReached = response.MaxDepthReached
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to parse visual tree JSON");
-            return new VisualTreeResult
-            {
-                Root = new VisualTreeNode { Handle = "parse_error", TypeName = "Error", Name = ex.Message },
-                TotalElements = 0,
-                MaxDepthReached = false
-            };
-        }
-    }
-
-    private VisualTreeNode ParseVisualTreeNode(JsonElement element)
-    {
-        var node = new VisualTreeNode
-        {
-            Handle = element.GetProperty("handle").GetString() ?? "",
-            TypeName = element.GetProperty("typeName").GetString() ?? "",
-            Name = element.TryGetProperty("name", out var nameProp) ? nameProp.GetString() : null,
-            Children = new List<VisualTreeNode>()
+            Root = response.Tree?.Root ?? new VisualTreeNode { Handle = "empty", TypeName = "Unknown" },
+            TotalElements = response.Tree == null ? 0 : response.TotalElements,
+            MaxDepthReached = response.Tree != null && response.MaxDepthReached
         };
-
-        if (element.TryGetProperty("children", out var childrenProp))
-        {
-            foreach (var childElement in childrenProp.EnumerateArray())
-            {
-                node.Children.Add(ParseVisualTreeNode(childElement));
-            }
-        }
-
-        return node;
     }
 
     private ElementPropertiesResult ParseElementPropertiesResponse(GetElementPropertiesResponse response, string handle)
     {
-        var result = new ElementPropertiesResult
+        return new ElementPropertiesResult
         {
-            Element = new ElementInfo { Handle = handle, TypeName = "Unknown" },
-            Properties = new List<PropertyInfo>()
+            Element = new ElementInfo { Handle = handle, TypeName = response.Properties?.Element?.TypeName ?? "Unknown" },
+            Properties = response.Properties?.Properties.Select(property => new PropertyInfo
+            {
+                Name = property.Name ?? "",
+                TypeName = property.TypeName ?? "",
+                Value = property.Value is { } value ? GetJsonValueAsString(value) : null,
+                Source = property.Source ?? PropertyValueSource.Unknown
+            }).ToList() ?? new List<PropertyInfo>()
         };
-
-        if (string.IsNullOrEmpty(response.PropertiesJson))
-        {
-            return result;
-        }
-
-        try
-        {
-            using var doc = JsonDocument.Parse(response.PropertiesJson);
-            var root = doc.RootElement;
-
-            if (root.TryGetProperty("element", out var elem))
-            {
-                result.Element.TypeName = elem.TryGetProperty("typeName", out var tp)
-                    ? tp.GetString() ?? "Unknown" : "Unknown";
-            }
-
-            if (root.TryGetProperty("properties", out var props) && props.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var prop in props.EnumerateArray())
-                {
-                    result.Properties.Add(new PropertyInfo
-                    {
-                        Name = prop.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "",
-                        TypeName = prop.TryGetProperty("typeName", out var t) ? t.GetString() ?? "" : "",
-                        Value = prop.TryGetProperty("value", out var v) ? GetJsonValueAsString(v) : null,
-                        Source = prop.TryGetProperty("source", out var s) ? s.Deserialize<PropertyValueSource>() : PropertyValueSource.Unknown
-                    });
-                }
-            }
-        }
-        catch (JsonException) { throw; }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to parse properties JSON");
-        }
-
-        return result;
     }
 
     private static string? GetJsonValueAsString(JsonElement value)
     {
         return value.ValueKind switch
         {
-            JsonValueKind.Null => null,
+            JsonValueKind.Null or JsonValueKind.Undefined => null,
             JsonValueKind.String => value.GetString(),
             _ => value.GetRawText()
         };
     }
 
-    private FindElementsResult ParseFindElementsResponse(FindElementsResponse response)
+    private FindElementsResult ParseFindElementsResponse(FindElementsResponse response) => new()
     {
-        var result = new FindElementsResult
-        {
-            Elements = new List<FoundElement>(),
-            Count = response.Count
-        };
+        Elements = response.Elements?.Elements ?? new List<FoundElement>(), Count = response.Count
+    };
 
-        if (string.IsNullOrEmpty(response.ElementsJson))
-        {
-            return result;
-        }
-
-        try
-        {
-            using var doc = JsonDocument.Parse(response.ElementsJson);
-            var root = doc.RootElement;
-
-            // New format: {"elements":[...], "count":N}
-            if (root.TryGetProperty("elements", out var elementsArray))
-            {
-                foreach (var elem in elementsArray.EnumerateArray())
-                {
-                    result.Elements.Add(ParseFoundElement(elem));
-                }
-            }
-            else
-            {
-                // Old format: plain array (backward compatibility)
-                foreach (var elem in root.EnumerateArray())
-                {
-                    result.Elements.Add(ParseFoundElement(elem));
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to parse elements JSON");
-        }
-
-        return result;
-    }
-
-    private static FoundElement ParseFoundElement(JsonElement elem)
+    private FindElementsResult ParseFindElementsDeepResponse(FindElementsDeepResponse response) => new()
     {
-        var found = new FoundElement
-        {
-            Handle = elem.TryGetProperty("handle", out var h) ? h.GetString() ?? "" : "",
-            TypeName = elem.TryGetProperty("typeName", out var t) ? t.GetString() ?? "" : "",
-            Name = elem.TryGetProperty("name", out var n) ? n.GetString() : null,
-            Text = elem.TryGetProperty("text", out var txt) ? txt.GetString() : null,
-            AutomationId = elem.TryGetProperty("automationId", out var aid) ? aid.GetString() : null,
-            Path = elem.TryGetProperty("path", out var p) ? p.GetString() ?? "" : ""
-        };
-
-        if (elem.TryGetProperty("isVisible", out var vis) &&
-            (vis.ValueKind == JsonValueKind.True || vis.ValueKind == JsonValueKind.False))
-        {
-            found.IsVisible = vis.GetBoolean();
-        }
-
-        if (elem.TryGetProperty("isEnabled", out var en) &&
-            (en.ValueKind == JsonValueKind.True || en.ValueKind == JsonValueKind.False))
-        {
-            found.IsEnabled = en.GetBoolean();
-        }
-
-        if (elem.TryGetProperty("screenBounds", out var b) && b.ValueKind == JsonValueKind.Object)
-        {
-            found.ScreenBounds = new ScreenBounds
-            {
-                X = b.TryGetProperty("x", out var x) ? x.GetInt32() : 0,
-                Y = b.TryGetProperty("y", out var y) ? y.GetInt32() : 0,
-                Width = b.TryGetProperty("width", out var w) ? w.GetInt32() : 0,
-                Height = b.TryGetProperty("height", out var hh) ? hh.GetInt32() : 0
-            };
-        }
-
-        return found;
-    }
-
-    private FindElementsResult ParseFindElementsDeepResponse(FindElementsDeepResponse response)
-    {
-        var result = new FindElementsResult
-        {
-            Elements = new List<FoundElement>(),
-            Count = response.Count
-        };
-
-        if (string.IsNullOrEmpty(response.ElementsJson))
-        {
-            return result;
-        }
-
-        try
-        {
-            using var doc = JsonDocument.Parse(response.ElementsJson);
-            var root = doc.RootElement;
-
-            // Format: {"elements":[...], "count":N}
-            if (root.TryGetProperty("elements", out var elementsArray))
-            {
-                foreach (var elem in elementsArray.EnumerateArray())
-                {
-                    result.Elements.Add(ParseFoundElement(elem));
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to parse elements deep search JSON");
-        }
-
-        return result;
-    }
+        Elements = response.Elements?.Elements ?? new List<FoundElement>(), Count = response.Count
+    };
 
     private BindingsResult ParseBindingsResponse(GetBindingsResponse response, string handle)
     {
-        var result = new BindingsResult
+        return new BindingsResult
         {
             Element = new ElementInfo { Handle = handle, TypeName = "Unknown" },
-            Bindings = new List<BindingInfo>()
-        };
-
-        if (string.IsNullOrEmpty(response.BindingsJson))
-        {
-            return result;
-        }
-
-        try
-        {
-            using var doc = JsonDocument.Parse(response.BindingsJson);
-            var root = doc.RootElement;
-
-            if (root.TryGetProperty("bindings", out var bindings) && bindings.ValueKind == JsonValueKind.Array)
+            Bindings = response.Bindings?.Bindings.Select(binding => new BindingInfo
             {
-                foreach (var binding in bindings.EnumerateArray())
-                {
-                    result.Bindings.Add(new BindingInfo
-                    {
-                        Property = binding.TryGetProperty("property", out var prop) ? prop.GetString() ?? "" : "",
-                        Path = binding.TryGetProperty("path", out var path) ? path.GetString() ?? "" : "",
-                        Kind = binding.TryGetProperty("type", out var kind) ? kind.Deserialize<BindingKind?>() : null,
-                        SourceKind = binding.TryGetProperty("sourceKind", out var sourceKind) ? sourceKind.Deserialize<BindingSourceKind?>() : null,
-                        RelativeSourceMode = binding.TryGetProperty("relativeSourceMode", out var relativeSourceMode) ? relativeSourceMode.Deserialize<BindingRelativeSourceMode?>() : null,
-                        SourceType = binding.TryGetProperty("sourceType", out var sourceType) ? sourceType.GetString() : null,
-                        ElementName = binding.TryGetProperty("elementName", out var elementName) ? elementName.GetString() : null,
-                        AncestorType = binding.TryGetProperty("ancestorType", out var ancestorType) ? ancestorType.GetString() : null,
-                        AncestorLevel = binding.TryGetProperty("ancestorLevel", out var ancestorLevel) ? ancestorLevel.GetInt32() : null,
-                        Mode = binding.TryGetProperty("mode", out var mode) ? mode.Deserialize<BindingMode?>() : null,
-                        UpdateTrigger = binding.TryGetProperty("updateTrigger", out var trigger) ? trigger.Deserialize<UpdateSourceTrigger?>() : null,
-                        Status = binding.TryGetProperty("status", out var status) ? status.Deserialize<BindingStatus?>() : null,
-                        CurrentValue = binding.TryGetProperty("currentValue", out var val) && val.ValueKind != JsonValueKind.Null ? val.ToString() : null
-                    });
-                }
-            }
-        }
-        catch (JsonException) { throw; }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to parse bindings JSON");
-        }
-
-        return result;
+                Property = binding.Property ?? "",
+                Path = binding.Path ?? "",
+                Kind = binding.Type,
+                SourceKind = binding.SourceKind,
+                RelativeSourceMode = binding.RelativeSourceMode,
+                SourceType = binding.SourceType,
+                ElementName = binding.ElementName,
+                AncestorType = binding.AncestorType,
+                AncestorLevel = binding.AncestorLevel,
+                Mode = binding.Mode,
+                UpdateTrigger = binding.UpdateTrigger,
+                Status = binding.Status,
+                CurrentValue = binding.CurrentValue is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) } value ? value.ToString() : null
+            }).ToList() ?? new List<BindingInfo>()
+        };
     }
 
-    private BindingErrorsResult ParseBindingErrorsResponse(GetBindingErrorsResponse response)
+    private BindingErrorsResult ParseBindingErrorsResponse(GetBindingErrorsResponse response) => new()
     {
-        var result = new BindingErrorsResult
-        {
-            Errors = new List<BindingError>(),
-            Count = response.Count
-        };
+        Errors = response.Errors?.Errors ?? new List<BindingError>(), Count = response.Count
+    };
 
-        if (string.IsNullOrEmpty(response.ErrorsJson))
-        {
-            return result;
-        }
-
-        try
-        {
-            using var doc = JsonDocument.Parse(response.ErrorsJson);
-            // Inspector format: {"errors":[...],"count":N}; plain array kept for compatibility.
-            var errorsArray = doc.RootElement.ValueKind == JsonValueKind.Object &&
-                              doc.RootElement.TryGetProperty("errors", out var e)
-                ? e
-                : doc.RootElement;
-            foreach (var error in errorsArray.EnumerateArray())
-            {
-                result.Errors.Add(new BindingError
-                {
-                    ElementType = error.TryGetProperty("elementType", out var et) ? et.GetString() ?? "" : "",
-                    ElementName = error.TryGetProperty("elementName", out var en) ? en.GetString() : null,
-                    Property = error.TryGetProperty("property", out var p) ? p.GetString() ?? "" : "",
-                    BindingPath = error.TryGetProperty("bindingPath", out var bp) ? bp.GetString() ?? "" : "",
-                    ErrorType = error.TryGetProperty("errorType", out var type) ? type.Deserialize<BindingErrorType>() : BindingErrorType.Unknown,
-                    Message = error.TryGetProperty("message", out var m) ? m.GetString() ?? "" : "",
-                    Timestamp = error.TryGetProperty("timestamp", out var ts)
-                        ? DateTime.Parse(ts.GetString() ?? DateTime.UtcNow.ToString())
-                        : DateTime.UtcNow
-                });
-            }
-        }
-        catch (JsonException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to parse binding errors JSON");
-        }
-
-        return result;
-    }
-
-    private ResourcesResult ParseResourcesResponse(GetResourcesResponse response)
+    private ResourcesResult ParseResourcesResponse(GetResourcesResponse response) => new()
     {
-        var result = new ResourcesResult
+        Resources = response.Resources?.Select(resource => new ResourceInfo
         {
-            Resources = new List<ResourceInfo>()
-        };
-
-        if (string.IsNullOrEmpty(response.ResourcesJson))
-        {
-            return result;
-        }
-
-        try
-        {
-            using var doc = JsonDocument.Parse(response.ResourcesJson);
-            foreach (var resource in doc.RootElement.EnumerateArray())
-            {
-                result.Resources.Add(new ResourceInfo
-                {
-                    Key = resource.TryGetProperty("key", out var k) ? k.GetString() ?? "" : "",
-                    TypeName = resource.TryGetProperty("typeName", out var t) ? t.GetString() ?? "" : "",
-                    Value = resource.TryGetProperty("value", out var v) ? GetJsonValueAsString(v) : null,
-                    Source = resource.TryGetProperty("source", out var s) ? s.GetString() ?? "" : ""
-                });
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to parse resources JSON");
-        }
-
-        return result;
-    }
+            Key = resource.Key ?? "", TypeName = resource.TypeName ?? "",
+            Value = resource.Value is { } value ? GetJsonValueAsString(value) : null, Source = resource.Source ?? ""
+        }).ToList() ?? new List<ResourceInfo>()
+    };
 
     private StylesResult ParseStylesResponse(GetStylesResponse response, string handle)
     {
-        var result = new StylesResult
+        var style = response.Styles?.Style;
+        return new StylesResult
         {
             Element = new ElementInfo { Handle = handle, TypeName = "Unknown" },
             Style = new StyleInfo
             {
-                Key = "",
-                TargetType = "",
-                Setters = new List<SetterInfo>()
+                Key = style?.Key ?? "", TargetType = style?.TargetType ?? "",
+                Setters = style?.Setters.Select(setter => new SetterInfo
+                {
+                    Property = setter.Property ?? "", Value = setter.Value is { } value ? GetJsonValueAsString(value) : null
+                }).ToList() ?? new List<SetterInfo>()
             }
         };
-
-        if (string.IsNullOrEmpty(response.StylesJson))
-        {
-            return result;
-        }
-
-        try
-        {
-            using var doc = JsonDocument.Parse(response.StylesJson);
-            var root = doc.RootElement;
-
-            if (root.TryGetProperty("style", out var style))
-            {
-                result.Style.Key = style.TryGetProperty("key", out var k) ? k.GetString() ?? "" : "";
-                result.Style.TargetType = style.TryGetProperty("targetType", out var t) ? t.GetString() ?? "" : "";
-
-                if (style.TryGetProperty("setters", out var setters) && setters.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var setter in setters.EnumerateArray())
-                    {
-                        result.Style.Setters.Add(new SetterInfo
-                        {
-                            Property = setter.TryGetProperty("property", out var p) ? p.GetString() ?? "" : "",
-                            Value = setter.TryGetProperty("value", out var v) ? GetJsonValueAsString(v) : null
-                        });
-                    }
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to parse styles JSON");
-        }
-
-        return result;
     }
 
     private LayoutInfoResult ParseLayoutInfoResponse(GetLayoutInfoResponse response, string handle)
     {
-        var result = new LayoutInfoResult
+        var layout = response.Layout?.Layout;
+        return new LayoutInfoResult
         {
             Element = new ElementInfo { Handle = handle, TypeName = "Unknown" },
-            Layout = new LayoutInfo()
-        };
-
-        if (string.IsNullOrEmpty(response.LayoutJson))
-        {
-            return result;
-        }
-
-        try
-        {
-            using var doc = JsonDocument.Parse(response.LayoutJson);
-            var root = doc.RootElement;
-
-            if (root.TryGetProperty("layout", out var layout))
+            Layout = layout == null ? new LayoutInfo() : new LayoutInfo
             {
-                result.Layout.ActualWidth = layout.TryGetProperty("actualWidth", out var aw) ? aw.GetDouble() : 0;
-                result.Layout.ActualHeight = layout.TryGetProperty("actualHeight", out var ah) ? ah.GetDouble() : 0;
-                result.Layout.HorizontalAlignment = layout.TryGetProperty("horizontalAlignment", out var ha) ? ha.Deserialize<HorizontalAlignment?>() : null;
-                result.Layout.VerticalAlignment = layout.TryGetProperty("verticalAlignment", out var va) ? va.Deserialize<VerticalAlignment?>() : null;
-                result.Layout.Visibility = layout.TryGetProperty("visibility", out var vis) ? vis.Deserialize<Visibility?>() : null;
-
-                if (layout.TryGetProperty("desiredSize", out var ds))
-                {
-                    result.Layout.DesiredSize = new SizeInfo
-                    {
-                        Width = ds.TryGetProperty("width", out var w) ? w.GetDouble() : 0,
-                        Height = ds.TryGetProperty("height", out var h) ? h.GetDouble() : 0
-                    };
-                }
-
-                if (layout.TryGetProperty("renderSize", out var rs))
-                {
-                    result.Layout.RenderSize = new SizeInfo
-                    {
-                        Width = rs.TryGetProperty("width", out var w) ? w.GetDouble() : 0,
-                        Height = rs.TryGetProperty("height", out var h) ? h.GetDouble() : 0
-                    };
-                }
-
-                if (layout.TryGetProperty("margin", out var margin))
-                {
-                    result.Layout.Margin = new ThicknessInfo
-                    {
-                        Left = margin.TryGetProperty("left", out var l) ? l.GetDouble() : 0,
-                        Top = margin.TryGetProperty("top", out var t) ? t.GetDouble() : 0,
-                        Right = margin.TryGetProperty("right", out var r) ? r.GetDouble() : 0,
-                        Bottom = margin.TryGetProperty("bottom", out var b) ? b.GetDouble() : 0
-                    };
-                }
-
-                if (layout.TryGetProperty("padding", out var padding))
-                {
-                    result.Layout.Padding = new ThicknessInfo
-                    {
-                        Left = padding.TryGetProperty("left", out var l) ? l.GetDouble() : 0,
-                        Top = padding.TryGetProperty("top", out var t) ? t.GetDouble() : 0,
-                        Right = padding.TryGetProperty("right", out var r) ? r.GetDouble() : 0,
-                        Bottom = padding.TryGetProperty("bottom", out var b) ? b.GetDouble() : 0
-                    };
-                }
+                ActualWidth = layout.ActualWidth ?? 0,
+                ActualHeight = layout.ActualHeight ?? 0,
+                HorizontalAlignment = layout.HorizontalAlignment,
+                VerticalAlignment = layout.VerticalAlignment,
+                Visibility = layout.Visibility,
+                DesiredSize = new SizeInfo { Width = layout.DesiredSize?.Width ?? 0, Height = layout.DesiredSize?.Height ?? 0 },
+                RenderSize = new SizeInfo { Width = layout.RenderSize?.Width ?? 0, Height = layout.RenderSize?.Height ?? 0 },
+                Margin = Thickness(layout.Margin),
+                Padding = layout.Padding == null ? null : Thickness(layout.Padding)
             }
-        }
-        catch (JsonException) { throw; }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to parse layout info JSON");
-        }
-
-        return result;
+        };
     }
+
+    private static ThicknessInfo Thickness(InspectedThickness? value) => new()
+    {
+        Left = value?.Left ?? 0, Top = value?.Top ?? 0, Right = value?.Right ?? 0, Bottom = value?.Bottom ?? 0
+    };
 
     #endregion
 }

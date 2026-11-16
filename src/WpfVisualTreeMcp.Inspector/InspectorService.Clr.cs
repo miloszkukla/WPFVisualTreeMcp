@@ -14,7 +14,7 @@ public partial class InspectorService
     {
         using var process = Process.GetCurrentProcess();
         return new ClrReadResponse { Generation = _inspectionGeneration, ProcessId = process.Id,
-            Json = JsonSerializer.Serialize(new { generation = _inspectionGeneration, processId = process.Id, processStartUtc = process.StartTime.ToUniversalTime() }) };
+            Data = JsonSerializer.SerializeToElement(new { generation = _inspectionGeneration, processId = process.Id, processStartUtc = process.StartTime.ToUniversalTime() }) };
     }
 
     private IpcResponse HandleReadClr(JsonElement data)
@@ -27,7 +27,8 @@ public partial class InspectorService
         if (element == null) return new ClrReadResponse { Success = false, Error = StaleHandleError(request.ElementHandle), Generation = _inspectionGeneration };
         try
         {
-            return new ClrReadResponse { Json = _clrReader.Read(element, request.Path, request.Fields, request.Skip, request.Take, request.MembersOnly),
+            using var document = JsonDocument.Parse(_clrReader.Read(element, request.Path, request.Fields, request.Skip, request.Take, request.MembersOnly));
+            return new ClrReadResponse { Data = document.RootElement.Clone(),
                 Generation = _inspectionGeneration, ProcessId = Process.GetCurrentProcess().Id };
         }
         catch (Exception error) { return new ClrReadResponse { Success = false, Error = error.GetBaseException().Message, Generation = _inspectionGeneration }; }

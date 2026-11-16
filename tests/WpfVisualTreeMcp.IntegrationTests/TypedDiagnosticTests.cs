@@ -4,12 +4,60 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using WpfVisualTreeMcp.Inspector;
 using WpfVisualTreeMcp.Shared.Models;
+using WpfVisualTreeMcp.Shared.Ipc;
 using Xunit;
 
 namespace WpfVisualTreeMcp.IntegrationTests;
 
 public class TypedDiagnosticTests
 {
+    [Fact]
+    public void SharedEnumsMatchTheActualWpfDiagnosticEnums()
+    {
+        var valueSources = Enum.GetNames(typeof(System.Windows.BaseValueSource)).OrderBy(value => value).ToArray();
+        Assert.Equal(valueSources, Enum.GetNames(typeof(WpfBaseValueSource)).OrderBy(value => value).ToArray());
+        Assert.Equal(valueSources, Enum.GetNames(typeof(DataContextSource)).Where(value => value != nameof(DataContextSource.NotApplicable)).OrderBy(value => value).ToArray());
+        Assert.Equal(Enum.GetNames(typeof(System.Windows.Data.BindingStatus)).OrderBy(value => value), Enum.GetNames(typeof(WpfBindingStatus)).OrderBy(value => value));
+    }
+
+    [Fact]
+    public void RealBindingAndLayoutCrossTypedIpcResponse()
+    {
+        RunSta(() =>
+        {
+            var element = new TextBlock { Margin = new System.Windows.Thickness(1, 2, 3, 4) };
+            BindingOperations.SetBinding(element, TextBlock.TextProperty, new Binding("Name") { RelativeSource = new RelativeSource(RelativeSourceMode.Self) });
+            var analyzer = new BindingAnalyzer();
+            var bindings = IpcSerializer.Deserialize<BindingsPayload>(analyzer.GetBindings(element));
+            var wire = IpcSerializer.SerializeResponse(new GetBindingsResponse { Bindings = bindings });
+            var roundTrip = IpcSerializer.DeserializeResponse<GetBindingsResponse>(wire)!;
+            var binding = Assert.Single(roundTrip.Bindings!.Bindings, item => item.Property == "Text");
+            Assert.Equal("Name", binding.Path);
+            Assert.Equal(BindingSourceKind.RelativeSource, binding.SourceKind);
+            Assert.Equal(BindingRelativeSourceMode.Self, binding.RelativeSourceMode);
+            var layout = IpcSerializer.Deserialize<LayoutPayload>(new PropertyReader().GetLayoutInfo(element));
+            var layoutWire = IpcSerializer.SerializeResponse(new GetLayoutInfoResponse { Layout = layout });
+            Assert.Equal(3, IpcSerializer.DeserializeResponse<GetLayoutInfoResponse>(layoutWire)!.Layout!.Layout!.Margin!.Right);
+        });
+    }
+
+    [Fact]
+    public void RealDiagnosticPayloadsSupportContextAndMissingDependencyProperty()
+    {
+        RunSta(() =>
+        {
+            var element = new TextBlock { DataContext = new { Label = "example" } };
+            var analyzer = new BindingAnalyzer();
+            var context = IpcSerializer.Deserialize<DataContextPayload>(analyzer.GetDataContext(element))!;
+            Assert.Equal(DataContextSource.Local, context.DataContextSource);
+            Assert.Contains(context.DataContext!.Properties!, property => property.Name == "Label");
+            var evaluation = IpcSerializer.Deserialize<BindingEvaluationPayload>(analyzer.EvaluateBinding(element, "NoSuchProperty"))!;
+            Assert.Contains("not a dependency property", evaluation.Error);
+            var plain = IpcSerializer.Deserialize<DataContextPayload>(analyzer.GetDataContext(new System.Windows.DependencyObject()))!;
+            Assert.Equal(DataContextSource.NotApplicable, plain.DataContextSource);
+        });
+    }
+
     [Fact]
     public void Relative_binding_source_and_mode_are_separate()
     {

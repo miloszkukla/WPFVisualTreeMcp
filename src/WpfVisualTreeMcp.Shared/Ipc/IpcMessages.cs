@@ -32,7 +32,7 @@ public class GetVisualTreeRequest : IpcRequest
 
 public class GetVisualTreeResponse : IpcResponse
 {
-    public string? TreeJson { get; set; }
+    public VisualTreePayload? Tree { get; set; }
     public int TotalElements { get; set; }
     public bool MaxDepthReached { get; set; }
 }
@@ -46,7 +46,7 @@ public class GetElementPropertiesRequest : IpcRequest
 
 public class GetElementPropertiesResponse : IpcResponse
 {
-    public string? PropertiesJson { get; set; }
+    public PropertiesPayload? Properties { get; set; }
 }
 
 // Find Elements
@@ -70,7 +70,7 @@ public class FindElementsRequest : IpcRequest
 
 public class FindElementsResponse : IpcResponse
 {
-    public string? ElementsJson { get; set; }
+    public FindElementsPayload? Elements { get; set; }
     public int Count { get; set; }
 }
 
@@ -93,7 +93,7 @@ public class FindElementsDeepRequest : IpcRequest
 
 public class FindElementsDeepResponse : IpcResponse
 {
-    public string? ElementsJson { get; set; }
+    public FindElementsPayload? Elements { get; set; }
     public int Count { get; set; }
 }
 
@@ -109,7 +109,7 @@ public class ExplainTriggersRequest : IpcRequest
 
 public class ExplainTriggersResponse : IpcResponse
 {
-    public string? Json { get; set; }
+    public ExplainTriggersPayload? Triggers { get; set; }
 }
 
 // Evaluate Binding (explain why a property has its value)
@@ -122,7 +122,7 @@ public class EvaluateBindingRequest : IpcRequest
 
 public class EvaluateBindingResponse : IpcResponse
 {
-    public string? EvaluationJson { get; set; }
+    public BindingEvaluationPayload? Evaluation { get; set; }
 }
 
 // Snapshot (capture element subtree state for later diff)
@@ -155,7 +155,7 @@ public class DiffRequest : IpcRequest
 
 public class DiffResponse : IpcResponse
 {
-    public string? DiffJson { get; set; }
+    public DiffPayload? Diff { get; set; }
     public int ChangedCount { get; set; }
     public int AddedCount { get; set; }
     public int RemovedCount { get; set; }
@@ -246,7 +246,7 @@ public class GetLayoutInfoRequest : IpcRequest
 
 public class GetLayoutInfoResponse : IpcResponse
 {
-    public string? LayoutJson { get; set; }
+    public LayoutPayload? Layout { get; set; }
 }
 
 // Bindings
@@ -258,7 +258,7 @@ public class GetBindingsRequest : IpcRequest
 
 public class GetBindingsResponse : IpcResponse
 {
-    public string? BindingsJson { get; set; }
+    public BindingsPayload? Bindings { get; set; }
 }
 
 public class GetBindingErrorsRequest : IpcRequest
@@ -268,7 +268,7 @@ public class GetBindingErrorsRequest : IpcRequest
 
 public class GetBindingErrorsResponse : IpcResponse
 {
-    public string? ErrorsJson { get; set; }
+    public BindingErrorsPayload? Errors { get; set; }
     public int Count { get; set; }
 }
 
@@ -281,7 +281,7 @@ public class GetDataContextRequest : IpcRequest
 
 public class GetDataContextResponse : IpcResponse
 {
-    public string? DataContextJson { get; set; }
+    public DataContextPayload? DataContext { get; set; }
 }
 
 // Clear Binding Errors
@@ -305,7 +305,7 @@ public class GetResourcesRequest : IpcRequest
 
 public class GetResourcesResponse : IpcResponse
 {
-    public string? ResourcesJson { get; set; }
+    public List<ResourcePayload>? Resources { get; set; }
 }
 
 public class GetStylesRequest : IpcRequest
@@ -316,7 +316,7 @@ public class GetStylesRequest : IpcRequest
 
 public class GetStylesResponse : IpcResponse
 {
-    public string? StylesJson { get; set; }
+    public StylesPayload? Styles { get; set; }
 }
 
 // Highlight

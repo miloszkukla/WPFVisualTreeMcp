@@ -168,7 +168,7 @@ public class ScrollViewerBridgeTests
             {
                 RequestId = request.RequestId,
                 Count = 1,
-                ErrorsJson = "{\"errors\":[{\"errorType\":\"PathError\",\"message\":\"bad path\"}]}"
+                Errors = IpcSerializer.Deserialize<BindingErrorsPayload>("{\"errors\":[{\"errorType\":\"PathError\",\"message\":\"bad path\"}]}")
             };
             var bytes = Encoding.UTF8.GetBytes(IpcSerializer.SerializeResponse(response) + "\n");
             await server.WriteAsync(bytes, timeout.Token);
@@ -191,19 +191,14 @@ public class ScrollViewerBridgeTests
             using var reader = new StreamReader(server, Encoding.UTF8, leaveOpen: true);
             var envelope = IpcSerializer.DeserializeRequest((await reader.ReadLineAsync(timeout.Token))!);
             var request = IpcSerializer.DeserializeRequestData<GetBindingErrorsRequest>(envelope!.Value.data)!;
-            var response = new GetBindingErrorsResponse
-            {
-                RequestId = request.RequestId,
-                Count = 1,
-                ErrorsJson = "{\"errors\":[{\"errorType\":\"FutureValue\"}]}"
-            };
-            var bytes = Encoding.UTF8.GetBytes(IpcSerializer.SerializeResponse(response) + "\n");
+            var json = "{\"requestId\":\"" + request.RequestId + "\",\"success\":true,\"count\":1,\"errors\":{\"errors\":[{\"errorType\":\"FutureValue\"}]}}";
+            var bytes = Encoding.UTF8.GetBytes(json + "\n");
             await server.WriteAsync(bytes, timeout.Token);
             await server.FlushAsync(timeout.Token);
         });
 
         var action = () => CreateBridge().GetBindingErrorsAsync().WaitAsync(TimeSpan.FromSeconds(10));
-        await action.Should().ThrowAsync<System.Text.Json.JsonException>();
+        (await action.Should().ThrowAsync<InvalidOperationException>()).Which.Message.Should().Contain("BindingErrorType");
         await received;
     }
 

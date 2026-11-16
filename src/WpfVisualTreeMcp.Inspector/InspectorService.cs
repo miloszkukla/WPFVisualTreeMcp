@@ -429,7 +429,7 @@ public partial class InspectorService : IDisposable
         return new GetVisualTreeResponse
         {
             RequestId = request?.RequestId ?? "",
-            TreeJson = treeJson,
+            Tree = IpcSerializer.Deserialize<VisualTreePayload>(treeJson),
             TotalElements = CountElements(treeJson),
             MaxDepthReached = treeJson.Contains("\"maxDepthReached\":true")
         };
@@ -453,7 +453,7 @@ public partial class InspectorService : IDisposable
         return new GetElementPropertiesResponse
         {
             RequestId = request.RequestId,
-            PropertiesJson = propsJson
+            Properties = IpcSerializer.Deserialize<PropertiesPayload>(propsJson)
         };
     }
 
@@ -500,7 +500,7 @@ public partial class InspectorService : IDisposable
             return new FindElementsResponse
             {
                 RequestId = request?.RequestId ?? "",
-                ElementsJson = elementsJson,
+                Elements = IpcSerializer.Deserialize<FindElementsPayload>(elementsJson),
                 Count = ParseJsonCount(elementsJson)
             };
         }
@@ -517,7 +517,7 @@ public partial class InspectorService : IDisposable
         return new FindElementsResponse
         {
             RequestId = request?.RequestId ?? "",
-            ElementsJson = resultJson,
+            Elements = IpcSerializer.Deserialize<FindElementsPayload>(resultJson),
             Count = ParseJsonCount(resultJson)
         };
     }
@@ -542,7 +542,7 @@ public partial class InspectorService : IDisposable
             return new FindElementsDeepResponse
             {
                 RequestId = request?.RequestId ?? "",
-                ElementsJson = elementsJson,
+                Elements = IpcSerializer.Deserialize<FindElementsPayload>(elementsJson),
                 Count = ParseJsonCount(elementsJson)
             };
         }
@@ -559,7 +559,7 @@ public partial class InspectorService : IDisposable
         return new FindElementsDeepResponse
         {
             RequestId = request?.RequestId ?? "",
-            ElementsJson = resultJson,
+            Elements = IpcSerializer.Deserialize<FindElementsPayload>(resultJson),
             Count = ParseJsonCount(resultJson)
         };
     }
@@ -582,7 +582,7 @@ public partial class InspectorService : IDisposable
         return new GetBindingsResponse
         {
             RequestId = request.RequestId,
-            BindingsJson = bindingsJson
+            Bindings = IpcSerializer.Deserialize<BindingsPayload>(bindingsJson)
         };
     }
 
@@ -591,7 +591,7 @@ public partial class InspectorService : IDisposable
         var errorsJson = _bindingAnalyzer.GetBindingErrors();
         return new GetBindingErrorsResponse
         {
-            ErrorsJson = errorsJson,
+            Errors = IpcSerializer.Deserialize<BindingErrorsPayload>(errorsJson),
             // The analyzer JSON is {"errors":[...],"count":N} — read its count field;
             // CountJsonArrayItems is for arrays and overcounts on objects.
             Count = ParseJsonCount(errorsJson)
@@ -613,7 +613,7 @@ public partial class InspectorService : IDisposable
         return new GetResourcesResponse
         {
             RequestId = request?.RequestId ?? "",
-            ResourcesJson = resourcesJson
+            Resources = IpcSerializer.Deserialize<List<ResourcePayload>>(resourcesJson)
         };
     }
 
@@ -639,7 +639,7 @@ public partial class InspectorService : IDisposable
         return new GetStylesResponse
         {
             RequestId = request.RequestId,
-            StylesJson = stylesJson
+            Styles = IpcSerializer.Deserialize<StylesPayload>(stylesJson)
         };
     }
 
@@ -684,7 +684,7 @@ public partial class InspectorService : IDisposable
         }
 
         var json = _resourceInspector.ExplainTriggers(fe, request.PropertyName);
-        return new ExplainTriggersResponse { RequestId = request.RequestId, Json = json };
+        return new ExplainTriggersResponse { RequestId = request.RequestId, Triggers = IpcSerializer.Deserialize<ExplainTriggersPayload>(json) };
     }
 
     private IpcResponse HandleEvaluateBinding(JsonElement data)
@@ -709,7 +709,7 @@ public partial class InspectorService : IDisposable
         return new EvaluateBindingResponse
         {
             RequestId = request.RequestId,
-            EvaluationJson = json
+            Evaluation = IpcSerializer.Deserialize<BindingEvaluationPayload>(json)
         };
     }
 
@@ -770,7 +770,7 @@ public partial class InspectorService : IDisposable
         return new DiffResponse
         {
             RequestId = request.RequestId,
-            DiffJson = json,
+            Diff = IpcSerializer.Deserialize<DiffPayload>(json),
             ChangedCount = changed,
             AddedCount = added,
             RemovedCount = removed
@@ -1053,7 +1053,7 @@ public partial class InspectorService : IDisposable
         return new GetLayoutInfoResponse
         {
             RequestId = request.RequestId,
-            LayoutJson = layoutJson
+            Layout = IpcSerializer.Deserialize<LayoutPayload>(layoutJson)
         };
     }
 
@@ -1231,7 +1231,7 @@ public partial class InspectorService : IDisposable
         return new GetDataContextResponse
         {
             RequestId = request.RequestId,
-            DataContextJson = dcJson
+            DataContext = IpcSerializer.Deserialize<DataContextPayload>(dcJson)
         };
     }
 

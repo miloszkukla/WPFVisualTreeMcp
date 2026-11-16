@@ -12,7 +12,8 @@ public static class IpcSerializer
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        WriteIndented = false
+        WriteIndented = false,
+        MaxDepth = 512
     };
 
     public static string Serialize<T>(T message) where T : class

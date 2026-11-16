@@ -97,8 +97,7 @@ public partial class InspectionModeMatrixTests
         viewers.Count.Should().Be(1);
         var viewer = viewers.Elements.Single().Handle;
         var baseline = await bridge.ReadClrAsync(list, "", new[] { "Items.Count", "SelectedIndex" }, 0, 1, generation);
-        using var baselineDocument = JsonDocument.Parse(baseline.Json!);
-        var baselineValue = baselineDocument.RootElement.GetProperty("value");
+        var baselineValue = baseline.Data!.Value.GetProperty("value");
         var count = baselineValue.GetProperty("Items.Count").GetProperty("value").GetInt32();
         var selection = baselineValue.GetProperty("SelectedIndex").GetProperty("value").GetInt32();
         count.Should().Be(40);
@@ -130,12 +129,11 @@ public partial class InspectionModeMatrixTests
         await staleGeneration.Should().ThrowAsync<InvalidOperationException>().WithMessage("Stale inspection generation.*");
         (await ReadScrollStateAsync(bridge, viewer, generation)).offset.Should().Be(0);
         var final = await bridge.ReadClrAsync(list, "", new[] { "Items.Count", "SelectedIndex" }, 0, 1, generation);
-        using var finalDocument = JsonDocument.Parse(final.Json!);
-        var finalValue = finalDocument.RootElement.GetProperty("value");
+        var finalValue = final.Data!.Value.GetProperty("value");
         finalValue.GetProperty("Items.Count").GetProperty("value").GetInt32().Should().Be(count);
         finalValue.GetProperty("SelectedIndex").GetProperty("value").GetInt32().Should().Be(selection);
         var itemsAfter = await bridge.ReadClrAsync(list, "Items", new[] { "Name", "Description" }, 0, 100, generation);
-        itemsAfter.Json.Should().Be(itemsBefore.Json, "scrolling must preserve every item in order");
+        itemsAfter.Data!.Value.GetRawText().Should().Be(itemsBefore.Data!.Value.GetRawText(), "scrolling must preserve every item in order");
     }
 
     private static async Task WaitForScrollBoundaryAsync(IIpcBridge bridge, string handle, string generation, bool atEnd)
@@ -160,8 +158,7 @@ public partial class InspectionModeMatrixTests
     {
         var response = await bridge.ReadClrAsync(handle, "",
             new[] { "VerticalOffset", "ScrollableHeight", "ViewportHeight" }, 0, 1, generation);
-        using var document = JsonDocument.Parse(response.Json!);
-        var value = document.RootElement.GetProperty("value");
+        var value = response.Data!.Value.GetProperty("value");
         return (value.GetProperty("VerticalOffset").GetProperty("value").GetDouble(),
             value.GetProperty("ScrollableHeight").GetProperty("value").GetDouble(),
             value.GetProperty("ViewportHeight").GetProperty("value").GetDouble());
