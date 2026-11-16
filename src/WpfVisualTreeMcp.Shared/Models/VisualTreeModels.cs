@@ -1,3 +1,6 @@
+using System.Text.Json.Serialization;
+using WpfVisualTreeMcp.Shared.Ipc;
+
 namespace WpfVisualTreeMcp.Shared.Models;
 
 /// <summary>
@@ -82,7 +85,12 @@ public class FoundElement
 /// </summary>
 public class EvaluateBindingResult
 {
-    public string? Json { get; set; }
+    [JsonIgnore] public BindingEvaluationPayload? Payload { get; set; }
+    public string? Json
+    {
+        get => Payload == null ? null : IpcSerializer.Serialize(Payload);
+        set => Payload = string.IsNullOrEmpty(value) ? null : IpcSerializer.Deserialize<BindingEvaluationPayload>(value);
+    }
 }
 
 /// <summary>
@@ -90,7 +98,12 @@ public class EvaluateBindingResult
 /// </summary>
 public class ExplainTriggersResult
 {
-    public string? Json { get; set; }
+    [JsonIgnore] public ExplainTriggersPayload? Payload { get; set; }
+    public string? Json
+    {
+        get => Payload == null ? null : IpcSerializer.Serialize(Payload);
+        set => Payload = string.IsNullOrEmpty(value) ? null : IpcSerializer.Deserialize<ExplainTriggersPayload>(value);
+    }
 }
 
 /// <summary>
@@ -112,8 +125,13 @@ public class DiffResult
     public int AddedCount { get; set; }
     public int RemovedCount { get; set; }
 
+    [JsonIgnore] public DiffPayload? Payload { get; set; }
     /// <summary>The full diff document (summary + changed/added/removed) as JSON.</summary>
-    public string? Json { get; set; }
+    public string? Json
+    {
+        get => Payload == null ? null : IpcSerializer.Serialize(Payload);
+        set => Payload = string.IsNullOrEmpty(value) ? null : IpcSerializer.Deserialize<DiffPayload>(value);
+    }
 }
 
 /// <summary>

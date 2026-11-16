@@ -511,15 +511,18 @@ public class WpfControlsTests
     [WpfType("C1DataGrid")]
     public sealed class CustomGrid(WpfElement element) : Control(element);
 
+    private static WpfVisualTreeMcp.Shared.Ipc.ClrReadEnvelope ReadEnvelope(object value) =>
+        WpfVisualTreeMcp.Shared.Ipc.IpcSerializer.Deserialize<WpfVisualTreeMcp.Shared.Ipc.ClrReadEnvelope>(JsonSerializer.Serialize(value))!;
+
     [Fact]
     public async Task CollectionReadPreservesCompletenessAndDefersItemConversion()
     {
         var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
         transport.Setup(x => x.FindAsync(null, "ListBox", null, null, null, true, 10000)).ReturnsAsync("list");
-        transport.SetupSequence(x => x.ReadAsync("list", "ItemsSource", "Name"))
-            .ReturnsAsync(JsonSerializer.SerializeToElement(new { kind = "collection", truncated = false, deadlineReached = false, items = new[] { new { Name = new { value = "one" } } } }))
-            .ReturnsAsync(JsonSerializer.SerializeToElement(new { kind = "collection", truncated = true, deadlineReached = false, items = new[] { new { Name = new { error = "unreadable" } } } }))
-            .ReturnsAsync(JsonSerializer.SerializeToElement(new { kind = "collection", truncated = false, deadlineReached = true, items = Array.Empty<object>() }));
+        transport.SetupSequence(x => x.ReadTypedAsync("list", "ItemsSource", "Name"))
+            .ReturnsAsync(ReadEnvelope(new { kind = "collection", truncated = false, deadlineReached = false, items = new[] { new { Name = new { value = "one" } } } }))
+            .ReturnsAsync(ReadEnvelope(new { kind = "collection", truncated = true, deadlineReached = false, items = new[] { new { Name = new { error = "unreadable" } } } }))
+            .ReturnsAsync(ReadEnvelope(new { kind = "collection", truncated = false, deadlineReached = true, items = Array.Empty<object>() }));
         var list = await new WpfControls(transport.Object).FindAsync<ListBox>();
 
         var complete = await list.ReadCollectionAsync("ItemsSource", "Name", item => WpfSession.Value(item, "Name").GetString());
@@ -541,10 +544,10 @@ public class WpfControlsTests
     {
         var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
         transport.Setup(x => x.FindAsync(null, "ListBox", null, null, null, true, 10000)).ReturnsAsync("list");
-        transport.SetupSequence(x => x.ReadAsync("list", "DataContext.Items", "Name"))
-            .ReturnsAsync(JsonSerializer.SerializeToElement(new { kind = "object", value = new { Name = new { value = (string?)null } } }))
-            .ReturnsAsync(JsonSerializer.SerializeToElement(new { kind = "object", value = new { Name = new { error = "unreadable" } } }))
-            .ReturnsAsync(JsonSerializer.SerializeToElement(new { kind = "object", value = new { Name = new { value = "other" } } }));
+        transport.SetupSequence(x => x.ReadTypedAsync("list", "DataContext.Items", "Name"))
+            .ReturnsAsync(ReadEnvelope(new { kind = "object", value = new { Name = new { value = (string?)null } } }))
+            .ReturnsAsync(ReadEnvelope(new { kind = "object", value = new { Name = new { error = "unreadable" } } }))
+            .ReturnsAsync(ReadEnvelope(new { kind = "object", value = new { Name = new { value = "other" } } }));
         var list = await new WpfControls(transport.Object).FindAsync<ListBox>();
 
         var missingCollection = await list.ReadCollectionAsync("DataContext.Items", "Name", item => item);

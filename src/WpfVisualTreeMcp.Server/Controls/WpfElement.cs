@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using WpfVisualTreeMcp.Shared.Models;
+using WpfVisualTreeMcp.Shared.Ipc;
 
 namespace WpfVisualTreeMcp.Server.Controls;
 
@@ -25,6 +26,8 @@ public interface IWpfControlTransport
     Task<bool> IsTypeAsync(string handle, string type);
     Task<(string Handle, string? Name, string? Text, string? AutomationId)[]> FindAllAsync(string? type, string? name, string? text, string? root, bool visibleOnly);
     Task<JsonElement> ReadAsync(string handle, string path, string fields);
+    async Task<ClrReadEnvelope> ReadTypedAsync(string handle, string path, string fields) =>
+        IpcSerializer.Deserialize<ClrReadEnvelope>((await ReadAsync(handle, path, fields)).GetRawText()) ?? throw new InvalidOperationException("Missing CLR read envelope.");
     Task<JsonElement> GetTreeAsync(string? handle = null);
     Task<VisualTreeResult> GetTypedTreeAsync(string? handle = null);
     Task<BindingsResult> GetTypedBindingsAsync(string handle);
@@ -151,8 +154,15 @@ public class WpfElement : IEquatable<WpfElement>
     public async Task<bool> HasNoEffectAsync() => WpfSession.Value((await ReadAsync("", "Effect")).GetProperty("value"), "Effect").ValueKind == JsonValueKind.Null;
     public async Task<string?> EffectTypeNameAsync() => WpfSession.Value((await ReadAsync("", "Effect")).GetProperty("value"), "Effect").GetProperty("type").GetString();
     public Task<JsonElement> ReadAsync(string path, string fields) => Owner.Transport.ReadAsync(Handle, path, fields);
+    public Task<ClrReadEnvelope> ReadTypedAsync(string path, string fields) => Owner.Transport.ReadTypedAsync(Handle, path, fields);
+    public async Task<T> ReadProjectionAsync<T>(string path, string fields, Func<JsonElement, T> convert)
+    {
+        var value = (await ReadTypedAsync(path, fields)).Value;
+        if (value.ValueKind == JsonValueKind.Undefined) throw new KeyNotFoundException();
+        return convert(value);
+    }
     public async Task<CollectionRead<T>> ReadCollectionAsync<T>(string path, string fields, Func<JsonElement, T> convert) =>
-        new(await ReadAsync(path, fields), convert);
+        new(await ReadTypedAsync(path, fields), convert);
     public Task<JsonElement> BindingsAsync() => Owner.Transport.GetBindingsAsync(Handle);
     public async Task<bool> BindingContainsAsync(string expected)
     {

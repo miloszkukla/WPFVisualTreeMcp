@@ -108,12 +108,16 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
         return elements[0].Handle;
     }
 
-    public async Task<JsonElement> ReadAsync(string handle, string path, string fields)
+    public async Task<ClrReadEnvelope> ReadTypedAsync(string handle, string path, string fields)
     {
         var response = await ObserveAsync(new { handle, path, fields }, () =>
             Bridge.ReadClrAsync(handle, path, fields.Split(','), 0, 200, generation));
-        if (response.Data == null) throw new InvalidOperationException("Inspector returned no CLR data.");
-        using var projection = JsonDocument.Parse(IpcSerializer.Serialize(response.Data));
+        return response.Data ?? throw new InvalidOperationException("Inspector returned no CLR data.");
+    }
+
+    public async Task<JsonElement> ReadAsync(string handle, string path, string fields)
+    {
+        using var projection = JsonDocument.Parse(IpcSerializer.Serialize(await ReadTypedAsync(handle, path, fields)));
         return projection.RootElement.Clone();
     }
 

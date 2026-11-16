@@ -1,3 +1,6 @@
+using System.Text.Json.Serialization;
+using WpfVisualTreeMcp.Shared.Ipc;
+
 namespace WpfVisualTreeMcp.Shared.Models;
 
 /// <summary>
@@ -59,5 +62,10 @@ public class BindingErrorsResult
 public class DataContextResult
 {
     public ElementInfo Element { get; set; } = new();
-    public string? DataContextJson { get; set; }
+    [JsonIgnore] public DataContextPayload? Payload { get; set; }
+    public string? DataContextJson
+    {
+        get => Payload == null ? null : IpcSerializer.Serialize(Payload);
+        set => Payload = string.IsNullOrEmpty(value) ? null : IpcSerializer.Deserialize<DataContextPayload>(value);
+    }
 }

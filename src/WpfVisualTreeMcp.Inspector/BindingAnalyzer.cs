@@ -134,7 +134,7 @@ public class BindingAnalyzer
         else result.SourceKind = BindingSourceKind.DataContext;
     }
 
-    private static T ParseEnum<T>(object value) where T : struct => (T)Enum.Parse(typeof(T), value.ToString()!);
+    private static T ParseEnum<T>(Enum value) where T : struct, Enum => (T)Enum.Parse(typeof(T), value.ToString()!);
     private JsonElement TypedValue(object? value)
     {
         using var document = JsonDocument.Parse(FormatValue(value));

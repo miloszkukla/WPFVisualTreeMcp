@@ -5,9 +5,10 @@ using WpfVisualTreeMcp.Shared.Ipc;
 namespace WpfVisualTreeMcp.Server.Controls;
 
 /// <summary>A bounded collection read, or the non-collection value returned at that path.</summary>
-public sealed class CollectionRead<T>(JsonElement projection, Func<JsonElement, T> convert)
+public sealed class CollectionRead<T>(ClrReadEnvelope envelope, Func<JsonElement, T> convert)
 {
-    private readonly ClrReadEnvelope envelope = IpcSerializer.Deserialize<ClrReadEnvelope>(projection.GetRawText()) ?? throw new InvalidOperationException("Missing CLR read envelope.");
+    public CollectionRead(JsonElement projection, Func<JsonElement, T> convert)
+        : this(IpcSerializer.Deserialize<ClrReadEnvelope>(projection.GetRawText()) ?? throw new InvalidOperationException("Missing CLR read envelope."), convert) { }
     public ClrReadKind Kind => envelope.Kind;
     public bool IsCollection => Kind == ClrReadKind.Collection;
     public bool IsObject => Kind == ClrReadKind.Object;

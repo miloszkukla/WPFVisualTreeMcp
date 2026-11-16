@@ -1,5 +1,6 @@
 using System.Runtime.ExceptionServices;
 using System.Text.Json;
+using WpfVisualTreeMcp.Shared.Ipc;
 
 namespace WpfVisualTreeMcp.Server.Controls;
 
@@ -45,8 +46,9 @@ public readonly struct ProjectedValue<T>
             if (projection.ValueKind == JsonValueKind.Object && !projection.TryGetProperty(field, out _))
                 return new(default, missingField: field);
             var member = projection.GetProperty(field);
-            if (!member.TryGetProperty("value", out var value))
+            if (!member.TryGetProperty("value", out _))
                 return new(default, unreadableField: field, unreadableMember: member.ToString());
+            var value = (IpcSerializer.Deserialize<ClrProjectedField>(member.GetRawText()) ?? throw new InvalidOperationException("Missing projected field.")).Value;
             var hasString = value.ValueKind == JsonValueKind.String;
             try { return new(convert(value), hasStringValue: hasString); }
             catch (Exception error) { return new(default, ExceptionDispatchInfo.Capture(error), hasStringValue: hasString); }

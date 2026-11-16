@@ -61,3 +61,40 @@ public sealed class InspectionIdentity
     public int ProcessId { get; set; }
     public DateTime ProcessStartUtc { get; set; }
 }
+
+/// <summary>A projected member and its arbitrary CLR value.</summary>
+public sealed class ClrProjectedField
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public JsonElement Value { get; set; }
+    public bool? Missing { get; set; }
+    public string? Error { get; set; }
+}
+
+/// <summary>A projected member successfully read by the inspector.</summary>
+public sealed class ClrProjectedValue
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public object? Value { get; set; }
+}
+
+public sealed class ClrProjectedMissing
+{
+    public bool Missing { get; set; }
+    public string? Error { get; set; }
+}
+
+public sealed class ClrProjectedError
+{
+    public string? Error { get; set; }
+}
+
+public sealed class ClrTruncatedText
+{
+    public string Text { get; set; } = string.Empty;
+    public bool Truncated { get; set; }
+}
+
+public sealed class ClrObjectSummary
+{
+    public string? Type { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public int? Count { get; set; }
+}

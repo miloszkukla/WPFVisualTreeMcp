@@ -92,7 +92,9 @@ public sealed class VisualTreePayload
 public sealed class FindElementsPayload
 {
     public List<FoundElement> Elements { get; set; } = new();
-    public int Count { get; set; }
+    private int _count;
+    public int Count { get => _count; set { _count = value; HasCount = true; } }
+    [JsonIgnore] public bool HasCount { get; private set; }
     public bool? Truncated { get; set; }
     [JsonExtensionData] public Dictionary<string, JsonElement>? AdditionalFields { get; set; }
 }
@@ -135,7 +137,9 @@ public sealed class PropertyBindingDetails
 public sealed class BindingErrorsPayload
 {
     public List<BindingError> Errors { get; set; } = new();
-    public int Count { get; set; }
+    private int _count;
+    public int Count { get => _count; set { _count = value; HasCount = true; } }
+    [JsonIgnore] public bool HasCount { get; private set; }
     [JsonExtensionData] public Dictionary<string, JsonElement>? AdditionalFields { get; set; }
 }
 

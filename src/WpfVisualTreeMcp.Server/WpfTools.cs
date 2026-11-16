@@ -64,7 +64,7 @@ public partial class WpfTools
 
     [McpServerTool]
     [Description("Get the visual tree hierarchy. Use root_handle to start from a specific element (from wpf_find_elements). Use max_depth to control depth (1-100, default 25). For deep UIs like AvalonDock, increase max_depth or use root_handle to zoom into a subtree.")]
-    public async Task<object> WpfGetVisualTree(string? root_handle = null, int max_depth = 25)
+    public async Task<VisualTreeResult> WpfGetVisualTree(string? root_handle = null, int max_depth = 25)
     {
         if (max_depth < 1) max_depth = 1;
         if (max_depth > 100) max_depth = 100;
@@ -75,7 +75,7 @@ public partial class WpfTools
 
     [McpServerTool]
     [Description("Get all dependency properties of a UI element")]
-    public async Task<object> WpfGetElementProperties(string element_handle)
+    public async Task<ElementPropertiesResult> WpfGetElementProperties(string element_handle)
     {
         if (string.IsNullOrEmpty(element_handle))
         {
@@ -88,12 +88,12 @@ public partial class WpfTools
 
     [McpServerTool]
     [Description("Query elements across all open windows. Filters combine with AND: type_name (partial match, e.g. 'Button' matches 'System.Windows.Controls.Button'), element_name (x:Name substring), text (visible text content — matches a Button's caption, TextBlock text, Window title, AutomationProperties.Name, ToolTip; case-insensitive substring), property_filter (object of property name → expected value substring, e.g. {\"IsEnabled\": \"True\"}), visible_only (exclude collapsed/hidden elements — recommended when looking for something the user can see). PREFER text over dumping the tree: e.g. text='Save' + type_name='Button' finds the Save button directly. Results include text, automationId, isVisible, isEnabled and screenBounds (device pixels) so you can pick the right element without extra calls. Returns up to max_results (default 50).")]
-    public async Task<object> WpfFindElements(
+    public async Task<FindElementsResult> WpfFindElements(
         string? root_handle = null,
         string? type_name = null,
         string? element_name = null,
         string? text = null,
-        JsonElement? property_filter = null,
+        PropertyFilter? property_filter = null,
         bool visible_only = false,
         int max_results = 50)
     {
@@ -105,12 +105,12 @@ public partial class WpfTools
 
     [McpServerTool]
     [Description("Deep search for ALL elements matching criteria (no result limit). Requires at least type_name, element_name or text to avoid returning the entire tree. Same filters as wpf_find_elements: type_name (partial match), element_name (x:Name substring), text (visible text content), property_filter, visible_only. Use root_handle to limit scope.")]
-    public async Task<object> WpfFindElementsDeep(
+    public async Task<FindElementsResult> WpfFindElementsDeep(
         string? root_handle = null,
         string? type_name = null,
         string? element_name = null,
         string? text = null,
-        JsonElement? property_filter = null,
+        PropertyFilter? property_filter = null,
         bool visible_only = false)
     {
         if (string.IsNullOrEmpty(type_name) && string.IsNullOrEmpty(element_name) && string.IsNullOrEmpty(text))
@@ -124,24 +124,14 @@ public partial class WpfTools
         return result;
     }
 
-    private static Dictionary<string, string>? ToFilterDictionary(JsonElement? propertyFilter)
+    private static Dictionary<string, string>? ToFilterDictionary(Dictionary<string, JsonElement>? propertyFilter)
     {
-        if (!propertyFilter.HasValue || propertyFilter.Value.ValueKind != JsonValueKind.Object)
-        {
-            return null;
-        }
-
-        var filterDict = new Dictionary<string, string>();
-        foreach (var prop in propertyFilter.Value.EnumerateObject())
-        {
-            filterDict[prop.Name] = prop.Value.ToString();
-        }
-        return filterDict;
+        return propertyFilter?.ToDictionary(entry => entry.Key, entry => entry.Value.ToString());
     }
 
     [McpServerTool]
     [Description("Get all data bindings for an element with their status")]
-    public async Task<object> WpfGetBindings(string element_handle)
+    public async Task<BindingsResult> WpfGetBindings(string element_handle)
     {
         if (string.IsNullOrEmpty(element_handle))
         {
@@ -154,7 +144,7 @@ public partial class WpfTools
 
     [McpServerTool]
     [Description("List all binding errors captured since application start. Errors are detected via WPF trace listener. Use wpf_clear_binding_errors to reset the list.")]
-    public async Task<object> WpfGetBindingErrors()
+    public async Task<BindingErrorsResult> WpfGetBindingErrors()
     {
         var result = await _ipcBridge.GetBindingErrorsAsync();
         return result;
@@ -170,7 +160,7 @@ public partial class WpfTools
 
     [McpServerTool]
     [Description("Get the DataContext for an element, including type info, properties, INPC status, and inheritance chain up the visual tree. Essential for diagnosing binding path errors.")]
-    public async Task<object> WpfGetDataContext(string element_handle)
+    public async Task<DataContextResult> WpfGetDataContext(string element_handle)
     {
         if (string.IsNullOrEmpty(element_handle))
         {
@@ -183,7 +173,7 @@ public partial class WpfTools
 
     [McpServerTool]
     [Description("Enumerate resource dictionaries and their contents")]
-    public async Task<object> WpfGetResources(ResourceScope scope = ResourceScope.Application, string? element_handle = null)
+    public async Task<ResourcesResult> WpfGetResources(ResourceScope scope = ResourceScope.Application, string? element_handle = null)
     {
         if (!Enum.IsDefined(scope)) throw new ArgumentOutOfRangeException(nameof(scope));
         if (scope == ResourceScope.Element && string.IsNullOrEmpty(element_handle))
@@ -197,7 +187,7 @@ public partial class WpfTools
 
     [McpServerTool]
     [Description("Get applied styles and templates for an element")]
-    public async Task<object> WpfGetStyles(string element_handle)
+    public async Task<StylesResult> WpfGetStyles(string element_handle)
     {
         if (string.IsNullOrEmpty(element_handle))
         {
@@ -371,7 +361,7 @@ public partial class WpfTools
 
     [McpServerTool]
     [Description("Get layout information (ActualWidth, ActualHeight, Margin, etc.)")]
-    public async Task<object> WpfGetLayoutInfo(string element_handle)
+    public async Task<LayoutInfoResult> WpfGetLayoutInfo(string element_handle)
     {
         if (string.IsNullOrEmpty(element_handle))
         {

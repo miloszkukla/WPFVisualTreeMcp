@@ -122,22 +122,22 @@ public sealed class ClrReader
                 if (field == "$pointer")
                 {
                     if (!(value is UIElement pointerTarget)) throw new MissingMemberException(value?.GetType().FullName, field);
-                    result[field] = new { value = Pointer(pointerTarget) };
+                    result[field] = new ClrProjectedValue { Value = Pointer(pointerTarget) };
                     continue;
                 }
                 if (field == "$textLayout")
                 {
                     if (!(value is TextBlock layoutBlock)) throw new MissingMemberException(value?.GetType().FullName, field);
-                    result[field] = new { value = TextLayout(layoutBlock) };
+                    result[field] = new ClrProjectedValue { Value = TextLayout(layoutBlock) };
                     continue;
                 }
                 var projected = field == "$renderedText"
                     ? value is TextBlock textBlock ? TreeWalker.GetRenderedText(textBlock) : throw new MissingMemberException(value?.GetType().FullName, field)
                     : Resolve(value, field);
-                result[field] = new { value = Shallow(projected) };
+                result[field] = new ClrProjectedValue { Value = Shallow(projected) };
             }
-            catch (MissingMemberException error) { result[field] = new { missing = true, error = error.Message }; }
-            catch (Exception error) { result[field] = new { error = error.GetBaseException().Message }; }
+            catch (MissingMemberException error) { result[field] = new ClrProjectedMissing { Missing = true, Error = error.Message }; }
+            catch (Exception error) { result[field] = new ClrProjectedError { Error = error.GetBaseException().Message }; }
         }
         return result;
     }
@@ -281,11 +281,11 @@ public sealed class ClrReader
     private static object? Shallow(object? value)
     {
         if (value == null) return null;
-        if (value is string text) return text.Length <= 4096 ? (object)text : new { text = text.Substring(0, 4096), truncated = true };
+        if (value is string text) return text.Length <= 4096 ? (object)text : new ClrTruncatedText { Text = text.Substring(0, 4096), Truncated = true };
         if (value is Enum) return value.ToString();
         if (value is double d && (double.IsNaN(d) || double.IsInfinity(d))) return d.ToString(System.Globalization.CultureInfo.InvariantCulture);
         if (value is float f && (float.IsNaN(f) || float.IsInfinity(f))) return f.ToString(System.Globalization.CultureInfo.InvariantCulture);
         if (value.GetType().IsPrimitive || value is decimal || value is DateTime || value is DateTimeOffset || value is Guid) return value;
-        return new { type = value.GetType().FullName, count = value is ICollection collection ? (int?)collection.Count : null };
+        return new ClrObjectSummary { Type = value.GetType().FullName, Count = value is ICollection collection ? (int?)collection.Count : null };
     }
 }

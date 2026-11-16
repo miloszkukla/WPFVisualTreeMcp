@@ -499,11 +499,12 @@ public partial class InspectorService : IDisposable
             }
 
             var elementsJson = _treeWalker.FindElements(root, criteria, maxResults);
+            var rootElements = IpcSerializer.Deserialize<FindElementsPayload>(elementsJson);
             return new FindElementsResponse
             {
                 RequestId = request?.RequestId ?? "",
-                Elements = IpcSerializer.Deserialize<FindElementsPayload>(elementsJson),
-                Count = ParseJsonCount(elementsJson)
+                Elements = rootElements,
+                Count = rootElements?.HasCount == true ? rootElements.Count : ParseJsonCount(elementsJson)
             };
         }
 
@@ -516,11 +517,12 @@ public partial class InspectorService : IDisposable
 
         var resultJson = _treeWalker.FindElementsAcrossRoots(allRoots, criteria, maxResults);
 
+        var elements = IpcSerializer.Deserialize<FindElementsPayload>(resultJson);
         return new FindElementsResponse
         {
             RequestId = request?.RequestId ?? "",
-            Elements = IpcSerializer.Deserialize<FindElementsPayload>(resultJson),
-            Count = ParseJsonCount(resultJson)
+            Elements = elements,
+            Count = elements?.HasCount == true ? elements.Count : ParseJsonCount(resultJson)
         };
     }
 
@@ -541,11 +543,12 @@ public partial class InspectorService : IDisposable
             }
 
             var elementsJson = _treeWalker.FindElementsDeep(root, criteria);
+            var rootElements = IpcSerializer.Deserialize<FindElementsPayload>(elementsJson);
             return new FindElementsDeepResponse
             {
                 RequestId = request?.RequestId ?? "",
-                Elements = IpcSerializer.Deserialize<FindElementsPayload>(elementsJson),
-                Count = ParseJsonCount(elementsJson)
+                Elements = rootElements,
+                Count = rootElements?.HasCount == true ? rootElements.Count : ParseJsonCount(elementsJson)
             };
         }
 
@@ -558,11 +561,12 @@ public partial class InspectorService : IDisposable
 
         var resultJson = _treeWalker.FindElementsAcrossRoots(allRoots, criteria, 100000, true);
 
+        var elements = IpcSerializer.Deserialize<FindElementsPayload>(resultJson);
         return new FindElementsDeepResponse
         {
             RequestId = request?.RequestId ?? "",
-            Elements = IpcSerializer.Deserialize<FindElementsPayload>(resultJson),
-            Count = ParseJsonCount(resultJson)
+            Elements = elements,
+            Count = elements?.HasCount == true ? elements.Count : ParseJsonCount(resultJson)
         };
     }
 
@@ -591,12 +595,11 @@ public partial class InspectorService : IDisposable
     private IpcResponse HandleGetBindingErrors()
     {
         var errorsJson = _bindingAnalyzer.GetBindingErrors();
+        var errors = IpcSerializer.Deserialize<BindingErrorsPayload>(errorsJson);
         return new GetBindingErrorsResponse
         {
-            Errors = IpcSerializer.Deserialize<BindingErrorsPayload>(errorsJson),
-            // The analyzer JSON is {"errors":[...],"count":N} — read its count field;
-            // CountJsonArrayItems is for arrays and overcounts on objects.
-            Count = ParseJsonCount(errorsJson)
+            Errors = errors,
+            Count = errors?.HasCount == true ? errors.Count : ParseJsonCount(errorsJson)
         };
     }
 

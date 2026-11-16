@@ -279,7 +279,7 @@ public partial class NamedPipeBridge : IIpcBridge
             throw ResponseError(response, "Failed to explain triggers");
         }
 
-        return new ExplainTriggersResult { Json = response.Triggers == null ? null : IpcSerializer.Serialize(response.Triggers) };
+        return new ExplainTriggersResult { Payload = response.Triggers };
     }
 
     public async Task<EvaluateBindingResult> EvaluateBindingAsync(string elementHandle, string propertyName)
@@ -300,7 +300,7 @@ public partial class NamedPipeBridge : IIpcBridge
             throw ResponseError(response, "Failed to evaluate binding");
         }
 
-        return new EvaluateBindingResult { Json = response.Evaluation == null ? null : IpcSerializer.Serialize(response.Evaluation) };
+        return new EvaluateBindingResult { Payload = response.Evaluation };
     }
 
     public async Task<SnapshotResult> SnapshotAsync(string? elementHandle, string? label, int maxDepth)
@@ -348,7 +348,7 @@ public partial class NamedPipeBridge : IIpcBridge
             ChangedCount = response.ChangedCount,
             AddedCount = response.AddedCount,
             RemovedCount = response.RemovedCount,
-            Json = response.Diff == null ? null : IpcSerializer.Serialize(response.Diff)
+            Payload = response.Diff
         };
     }
 
@@ -518,7 +518,7 @@ public partial class NamedPipeBridge : IIpcBridge
         return new DataContextResult
         {
             Element = new ElementInfo { Handle = elementHandle },
-            DataContextJson = response.DataContext == null ? null : IpcSerializer.Serialize(response.DataContext)
+            Payload = response.DataContext
         };
     }
 
