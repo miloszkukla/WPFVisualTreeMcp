@@ -426,6 +426,19 @@ public class WpfControlsTests
     }
 
     [Fact]
+    public async Task ItemsLayoutStateIsReadAsOneObservation()
+    {
+        var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);
+        transport.Setup(x => x.FindAsync(null, "ListBox", null, null, null, true, 10000)).ReturnsAsync("list");
+        transport.Setup(x => x.ReadAsync("list", "", "Items.Count,IsMeasureValid,IsArrangeValid"))
+            .ReturnsAsync(JsonSerializer.SerializeToElement(new { value = new Dictionary<string, object> { ["Items.Count"] = new { value = 3 }, ["IsMeasureValid"] = new { value = true }, ["IsArrangeValid"] = new { value = false } } }));
+        var list = await new WpfControls(transport.Object).FindAsync<ListBox>();
+
+        (await list.ItemsLayoutStateAsync()).Should().Be(new ItemsLayoutState(3, true, false));
+        transport.VerifyAll();
+    }
+
+    [Fact]
     public async Task LookupPropagatesTransportFailuresAndCancellation()
     {
         var transport = new Mock<IWpfControlTransport>(MockBehavior.Strict);

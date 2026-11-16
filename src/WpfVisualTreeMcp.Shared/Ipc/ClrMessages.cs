@@ -32,8 +32,7 @@ public sealed class ClrReadEnvelope
 {
     [JsonRequired] public ClrReadKind Kind { get; set; }
     public string? Type { get; set; }
-    [JsonPropertyName("totalCount"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public JsonElement TotalCountValue { get; set; }
-    [JsonIgnore] public int? TotalCount => TotalCountValue.ValueKind == JsonValueKind.Number ? TotalCountValue.GetInt32() : null;
+    public int? TotalCount { get; set; }
     public int? Skip { get; set; }
     public int? Returned { get; set; }
     public bool? Truncated { get; set; }
@@ -43,6 +42,7 @@ public sealed class ClrReadEnvelope
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public JsonElement Value { get; set; }
     [JsonExtensionData] public Dictionary<string, JsonElement>? AdditionalFields { get; set; }
 }
+
 public sealed class ClrMember
 {
     public string? Name { get; set; }

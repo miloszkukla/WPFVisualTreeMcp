@@ -27,7 +27,7 @@ public partial class InspectorService
         if (element == null) return new ClrReadResponse { Success = false, Error = StaleHandleError(request.ElementHandle), Generation = _inspectionGeneration };
         try
         {
-            var projection = IpcSerializer.Deserialize<ClrReadEnvelope>(_clrReader.Read(element, request.Path, request.Fields, request.Skip, request.Take, request.MembersOnly));
+            var projection = _clrReader.ReadTyped(element, request.Path, request.Fields, request.Skip, request.Take, request.MembersOnly);
             return new ClrReadResponse { Data = projection,
                 Generation = _inspectionGeneration, ProcessId = Process.GetCurrentProcess().Id };
         }

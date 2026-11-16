@@ -8,15 +8,27 @@ namespace WpfVisualTreeMcp.Tests;
 public class TypedResponsePayloadTests
 {
     [Fact]
-    public void ClrReadEnvelopePreservesUnknownAndNullCollectionValues()
+    public void ClrReadEnvelopePreservesUnknownFieldsAndReadsNullCount()
     {
         var envelope = IpcSerializer.Deserialize<ClrReadEnvelope>("{\"kind\":\"Collection\",\"totalCount\":null,\"skip\":1,\"returned\":1,\"truncated\":false,\"deadlineReached\":false,\"items\":[{\"arbitrary\":42}],\"future\":\"kept\"}")!;
         Assert.Equal(ClrReadKind.Collection, envelope.Kind);
         Assert.Null(envelope.TotalCount);
         Assert.Equal(42, Assert.Single(envelope.Items!).GetProperty("arbitrary").GetInt32());
         using var result = JsonDocument.Parse(IpcSerializer.Serialize(envelope));
-        Assert.Equal(JsonValueKind.Null, result.RootElement.GetProperty("totalCount").ValueKind);
+        Assert.False(result.RootElement.TryGetProperty("totalCount", out _));
         Assert.Equal("kept", result.RootElement.GetProperty("future").GetString());
+    }
+
+    [Fact]
+    public void ClrReadEnvelopeReadsMissingNullAndZeroCounts()
+    {
+        foreach (var (json, value) in new[] { ("{}", (int?)null), ("{\"totalCount\":null}", (int?)null), ("{\"totalCount\":0}", (int?)0) })
+        {
+            var envelope = IpcSerializer.Deserialize<ClrReadEnvelope>("{\"kind\":\"Collection\"" + (json == "{}" ? "" : "," + json[1..^1]) + "}")!;
+            Assert.Equal(value, envelope.TotalCount);
+            using var result = JsonDocument.Parse(IpcSerializer.Serialize(envelope));
+            Assert.Equal(value.HasValue, result.RootElement.TryGetProperty("totalCount", out _));
+        }
     }
 
     [Fact]

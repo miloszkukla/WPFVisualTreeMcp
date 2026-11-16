@@ -38,6 +38,15 @@ public class ClrReaderTests
     }
 
     [Fact]
+    public void TypedReadProducesProjectionWithoutSerializingTheEnvelope()
+    {
+        var result = new ClrReader().ReadTyped(new Model(), "Entries", new[] { "Code" }, 1, 1);
+        Assert.Equal(ClrReadKind.Collection, result.Kind);
+        Assert.Equal(3, result.TotalCount);
+        Assert.Equal("B", Assert.Single(result.Items!).GetProperty("Code").GetProperty("value").GetString());
+    }
+
+    [Fact]
     public void NestedIndexedPathReadsScalarWithoutTraversingObjectGraph()
     {
         using var result = JsonDocument.Parse(new ClrReader().Read(new Model(), "Entries[2].Code", Array.Empty<string>(), 0, 1));

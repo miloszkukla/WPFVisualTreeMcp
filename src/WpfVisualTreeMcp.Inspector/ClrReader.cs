@@ -27,20 +27,23 @@ public sealed class ClrReader
     private static readonly Regex Segment = new(@"^([A-Za-z_]\w*)(?:\[(\d+)\])?$", RegexOptions.CultureInvariant);
     private static readonly JsonSerializerOptions Options = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, Converters = { new JsonStringEnumConverter(null, false) } };
 
-    public string Read(object root, string path, string[] fields, int skip, int take, bool membersOnly = false)
+    public string Read(object root, string path, string[] fields, int skip, int take, bool membersOnly = false) =>
+        IpcSerializer.Serialize(ReadTyped(root, path, fields, skip, take, membersOnly));
+
+    public ClrReadEnvelope ReadTyped(object root, string path, string[] fields, int skip, int take, bool membersOnly = false)
     {
         if (skip < 0 || skip > 10000 || take < 1 || take > 200 || fields.Length > 50)
             throw new ArgumentOutOfRangeException(nameof(take), "skip 0-10000, take 1-200 and at most 50 fields are supported.");
         var value = Resolve(root, path);
         if (membersOnly)
         {
-            if (value == null) return JsonSerializer.Serialize(new { kind = ClrReadKind.Null, members = new object[0] }, Options);
+            if (value == null) return new ClrReadEnvelope { Kind = ClrReadKind.Null, Members = new List<ClrMember>() };
             var members = value.GetType().GetMembers(BindingFlags.Public | BindingFlags.Instance)
                 .Where(m => m is PropertyInfo || m is FieldInfo || m is MethodInfo method && !method.IsSpecialName)
-                .Select(m => new { name = m.Name, kind = m.MemberType, signature = m.ToString() })
-                .OrderBy(m => m.name, StringComparer.Ordinal).ThenBy(m => m.signature, StringComparer.Ordinal).ToArray();
-            return JsonSerializer.Serialize(new { kind = ClrReadKind.Members, type = value.GetType().FullName,
-                totalCount = members.Length, skip, truncated = members.Length > skip + take, members = members.Skip(skip).Take(take).ToArray() }, Options);
+                .Select(m => new ClrMember { Name = m.Name, Kind = m.MemberType, Signature = m.ToString() })
+                .OrderBy(m => m.Name, StringComparer.Ordinal).ThenBy(m => m.Signature, StringComparer.Ordinal).ToArray();
+            return new ClrReadEnvelope { Kind = ClrReadKind.Members, Type = value.GetType().FullName,
+                TotalCount = members.Length, Skip = skip, Truncated = members.Length > skip + take, Members = members.Skip(skip).Take(take).ToList() };
         }
         if (value is IEnumerable enumerable && !(value is string))
         {
@@ -66,11 +69,12 @@ public sealed class ClrReader
                 if (!deadlineReached) hasMore = iterator.MoveNext();
             }
             finally { (iterator as IDisposable)?.Dispose(); }
-            return JsonSerializer.Serialize(new { kind = ClrReadKind.Collection, type = value.GetType().FullName,
-                totalCount = value is ICollection collection ? (int?)collection.Count : null,
-                skip, returned = rows.Count, truncated = hasMore || deadlineReached, deadlineReached, items = rows }, Options);
+            return new ClrReadEnvelope { Kind = ClrReadKind.Collection, Type = value.GetType().FullName,
+                TotalCount = value is ICollection collection ? (int?)collection.Count : null,
+                Skip = skip, Returned = rows.Count, Truncated = hasMore || deadlineReached, DeadlineReached = deadlineReached,
+                Items = rows.Select(row => JsonSerializer.SerializeToElement(row, Options)).ToList() };
         }
-        return JsonSerializer.Serialize(new { kind = fields.Length == 0 ? ClrReadKind.Value : ClrReadKind.Object, value = Project(value, fields) }, Options);
+        return new ClrReadEnvelope { Kind = fields.Length == 0 ? ClrReadKind.Value : ClrReadKind.Object, Value = JsonSerializer.SerializeToElement(Project(value, fields), Options) };
     }
 
     public static object? Resolve(object? current, string path)

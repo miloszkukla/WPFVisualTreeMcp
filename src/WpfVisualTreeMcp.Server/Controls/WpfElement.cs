@@ -8,6 +8,7 @@ namespace WpfVisualTreeMcp.Server.Controls;
 public readonly record struct ElementState(bool IsVisible, bool IsEnabled);
 public readonly record struct RenderedTextState(string? Text, bool IsVisible);
 public readonly record struct ScrollState(double Offset, double Height, double Viewport, bool MeasureValid, bool ArrangeValid);
+public readonly record struct ItemsLayoutState(int Count, bool MeasureValid, bool ArrangeValid);
 
 /// <summary>Identifies the target WPF CLR type represented by a proxy.</summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
@@ -328,6 +329,12 @@ public class RadioButton(WpfElement element) : ToggleButton(element);
 public class ItemsControl(WpfElement element) : Control(element)
 {
     public Task<int> ItemCountAsync() => PropertyAsync<int>("Items.Count");
+    public async Task<ItemsLayoutState> ItemsLayoutStateAsync()
+    {
+        var values = (await ReadAsync("", "Items.Count,IsMeasureValid,IsArrangeValid")).GetProperty("value");
+        return new ItemsLayoutState(WpfSession.Value(values, "Items.Count").GetInt32(), WpfSession.Value(values, "IsMeasureValid").GetBoolean(),
+            WpfSession.Value(values, "IsArrangeValid").GetBoolean());
+    }
 }
 
 [WpfType("HeaderedItemsControl")]
