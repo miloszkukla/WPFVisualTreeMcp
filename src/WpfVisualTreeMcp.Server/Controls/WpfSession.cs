@@ -210,7 +210,13 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
         var found = await ObserveAsync(new { handle }, () => Bridge.FindElementsAsync(handle, null, null, null, null, true, 1));
         var element = found.Elements.SingleOrDefault(item => item.Handle == handle);
         var bounds = element?.ScreenBounds ?? throw new InvalidOperationException("Target has no visible screen bounds: " + handle);
-        if (!SetCursorPos((int)(bounds.X + bounds.Width / 2), (int)(bounds.Y + bounds.Height / 2))) throw new InvalidOperationException("Could not move the pointer to the target.");
+        var previousDpi = SetThreadDpiAwarenessContext(new IntPtr(-4));
+        if (previousDpi == IntPtr.Zero) throw new InvalidOperationException("Could not use physical screen coordinates for the pointer.");
+        try
+        {
+            if (!SetCursorPos((int)(bounds.X + bounds.Width / 2), (int)(bounds.Y + bounds.Height / 2))) throw new InvalidOperationException("Could not move the pointer to the target.");
+        }
+        finally { SetThreadDpiAwarenessContext(previousDpi); }
         await Task.Delay(100, CancellationToken);
     }
 
@@ -245,6 +251,7 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
     }
 
     [DllImport("user32.dll")] private static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll")] private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
     [DllImport("user32.dll")] private static extern void mouse_event(uint flags, uint x, uint y, uint data, UIntPtr extraInfo);
 
     public async Task SendKeysAsync(string handle, string keys) =>
