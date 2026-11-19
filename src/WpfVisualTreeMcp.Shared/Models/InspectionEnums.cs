@@ -54,4 +54,4 @@ public enum NotificationType { PropertyChanged, BindingError }
 [JsonConverter(typeof(InspectionEnumConverter))]
 public enum BindingKind { Binding, MultiBinding }
 [JsonConverter(typeof(InspectionEnumConverter))]
-public enum InspectionErrorCode { UiThreadBusy, EmptyResponse, ElementNotVisible }
+public enum InspectionErrorCode { UiThreadBusy, EmptyResponse, ElementNotVisible, GenerationChanged }

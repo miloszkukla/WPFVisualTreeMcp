@@ -53,7 +53,7 @@ public class WpfSession(int processId, string output) : IWpfControlTransport
             {
                 var identity = await Bridge.GetInspectionIdentityAsync().WaitAsync(CancellationToken);
                 if (!identity.Success || identity.Generation != generation)
-                    throw new InvalidOperationException("The inspector generation changed; reacquire the target.");
+                    throw new InspectionException(InspectionErrorCode.GenerationChanged, "The inspector generation changed; reacquire the target.");
             }
             var result = await action().WaitAsync(CancellationToken);
             if (result is IpcResponse { Success: false } response)
