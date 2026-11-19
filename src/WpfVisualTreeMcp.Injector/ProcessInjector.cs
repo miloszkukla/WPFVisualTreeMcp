@@ -154,7 +154,8 @@ public class ProcessInjector
         var stdout = ReadHelperOutputAsync(helperProc.StandardOutput);
         var stderr = ReadHelperOutputAsync(helperProc.StandardError);
 
-        if (!helperProc.WaitForExit(15000))
+        // The helper still needs time to start before its own 10-second remote-thread wait begins.
+        if (!helperProc.WaitForExit(60000))
         {
             try { helperProc.Kill(); } catch { /* best effort */ }
             throw new TimeoutException(
