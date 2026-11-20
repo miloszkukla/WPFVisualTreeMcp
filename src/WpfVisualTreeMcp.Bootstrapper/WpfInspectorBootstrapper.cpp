@@ -44,10 +44,10 @@ typedef int32_t(__cdecl* hostfxr_close_fn)(
     const void* host_context_handle);
 
 // component_entry_point_fn: managed delegate signature for load_assembly_and_get_function_pointer
-typedef int (__cdecl* component_entry_point_fn)(void* arg, int32_t arg_size_in_bytes);
+typedef int (__stdcall* component_entry_point_fn)(void* arg, int32_t arg_size_in_bytes);
 
 // load_assembly_and_get_function_pointer delegate type
-typedef int32_t(__cdecl* load_assembly_and_get_function_pointer_fn)(
+typedef int32_t(__stdcall* load_assembly_and_get_function_pointer_fn)(
     const wchar_t* assembly_path,
     const wchar_t* type_name,
     const wchar_t* method_name,
